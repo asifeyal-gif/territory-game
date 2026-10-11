@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { Arena3D } from './arena3d';
 import { TerritoryGame, COLS, ROWS, TARGET, STEP_MS, RIVAL_STEP_MS, index, vectors, type Direction, type Point } from './engine';
 import './style.css';
 
@@ -30,6 +31,7 @@ const screenPoint = (p: Point): Point => ({ x: PAD + (p.x + .5) * CELL, y: PAD +
 
 class GameScene extends Phaser.Scene {
   model = new TerritoryGame();
+  private arena3d?: Arena3D;
   private terrain!: Phaser.GameObjects.Graphics;
   private surfaces: { texture: Phaser.Textures.CanvasTexture; top: string; bottom: string; highlight: string }[] = [];
   private landVersion = '';
@@ -78,6 +80,8 @@ class GameScene extends Phaser.Scene {
     const sync = () => { this.inactive = document.hidden || !document.hasFocus(); this.renderHud(); };
     document.addEventListener('visibilitychange', sync); window.addEventListener('blur', sync); window.addEventListener('focus', sync);
     this.events.once('shutdown', () => { document.removeEventListener('visibilitychange', sync); window.removeEventListener('blur', sync); window.removeEventListener('focus', sync); });
+    try { this.arena3d = new Arena3D(board); } catch (error) { console.info("3D unavailable; using the compatible 2D arena.", error); board.classList.remove("has-3d"); board.querySelector(".arena-3d")?.remove(); }
+    this.events.once("shutdown", () => this.arena3d?.dispose());
     this.renderHud();
   }
   private turn(direction: Direction): void { if (!this.paused && !this.inactive) this.model.turn(direction); }
@@ -256,6 +260,7 @@ class GameScene extends Phaser.Scene {
     }
     if (redFailures !== m.rivalFailures) this.burst(oldRival, RED, [], '×');
     if (this.revision !== m.revision) { this.revision = m.revision; this.drawTerrain(); this.renderHud(); }
+    this.arena3d?.render(m, elapsed, active && m.phase === "playing");
     const g = this.actors; g.clear();
     const interpolate = (from: Point, to: Point, fraction: number): Point => screenPoint({ x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction });
     const playerPoint = interpolate(m.previous, m.player, m.phase === 'playing' ? Math.min(1, m.progress / STEP_MS) : 1);

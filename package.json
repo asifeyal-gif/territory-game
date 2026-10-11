@@ -12,9 +12,11 @@
     "test:browser": "node tests/browser.mjs"
   },
   "dependencies": {
-    "phaser": "4.2.1"
+    "phaser": "4.2.1",
+    "three": "0.186.1"
   },
   "devDependencies": {
+    "@types/three": "0.186.0",
     "playwright": "1.64.0",
     "typescript": "7.0.2",
     "vite": "8.3.4"

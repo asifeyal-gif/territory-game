@@ -30,9 +30,34 @@ try {
   await page.evaluate(() => window.scene = window.testGame.scene.getScene('GameScene'));
   const state = () => page.evaluate(() => {
     const m = window.scene.model;
-    return { player: m.player, direction: m.direction, queued: m.queued, phase: m.phase, lives: m.lives, owned: m.owned.size, captures: m.captures, progress: m.progress, recovery: m.recovery, enemyClock: m.enemyClock, enemies: m.enemies, rival: m.rival, rivalOwned: m.rivalOwned.size, rivalTrail: m.rivalTrail, rivalClock: m.rivalClock, rivalRecovery: m.rivalRecovery, rivalCaptures: m.rivalCaptures };
+    return { player: m.player, direction: m.direction, queued: m.queued, phase: m.phase, lives: m.lives, owned: m.owned.size, captures: m.captures, progress: m.progress, recovery: m.recovery, enemyClock: m.enemyClock, enemies: m.enemies, rival: m.rival, rivalOwned: m.rivalOwned.size, rivalTrail: m.rivalTrail, rivalClock: m.rivalClock, rivalRecovery: m.rivalRecovery, rivalCaptures: m.rivalCaptures, visualTime: window.scene.arena3d?.time };
   });
   await mkdir('test-results', { recursive: true });
+  await page.waitForSelector('canvas.arena-3d');
+  await page.waitForTimeout(500);
+  const threeColors = await page.evaluate(() => {
+    const arena = window.scene.arena3d;
+    const gl = arena.renderer.getContext();
+    const pixels = [];
+    for (const [x,z] of [[-15.5,.5],[11.5,.5],[0,.5]]) {
+      const point = arena.ships[0].position.clone().set(x,.75,z).project(arena.camera);
+      const rgba = new Uint8Array(4);
+      gl.readPixels(Math.floor((point.x+1)*gl.drawingBufferWidth/2), Math.floor((point.y+1)*gl.drawingBufferHeight/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);
+      pixels.push([...rgba]);
+    }
+    return pixels;
+  });
+  assert(threeColors[0][2] > threeColors[0][0], '3D player island is blue');
+  assert(threeColors[1][0] > threeColors[1][2], '3D rival island is coral');
+  assert(threeColors[2][2] > threeColors[2][0], '3D ocean remains visible');
+  assert(await page.evaluate(() => {
+    const arena=window.scene.arena3d;
+    return [-18.4,18.4].every(x=>[-12.4,12.4].every(z=>{
+      const p=arena.ships[0].position.clone().set(x,0,z).project(arena.camera);
+      return Math.abs(p.x)<1 && Math.abs(p.y)<1;
+    }));
+  }), 'all four 3D arena corners fit the fixed camera');
+
   const sampleColors = async target => target.evaluate(async () => {
     const colors = [];
     for (const [x, y] of [[76, 268], [724, 268], [388, 316]]) {
@@ -182,15 +207,17 @@ try {
     const source = (await response.text()).replace('type: Phaser.AUTO', 'type: Phaser.CANVAS');
     await route.fulfill({ response, body: `${source}\nwindow.testGame = game;` });
   });
+  await fallback.route('**/src/arena3d.ts*', route => route.fulfill({ contentType: 'text/javascript', body: 'export class Arena3D { constructor() { throw new Error("Simulated unavailable WebGL"); } }' }));
   await fallback.goto(base); await fallback.bringToFront();
   await fallback.waitForFunction(() => window.testGame?.scene.getScene('GameScene')?.model);
   assert.equal(await fallback.evaluate(() => window.testGame.renderer.type), 1, 'Canvas fallback is actually selected');
+  assert.equal(await fallback.locator('#board').evaluate(board => board.classList.contains('has-3d')), false, 'unavailable 3D leaves visible 2D fallback');
   verifyColors(await sampleColors(fallback));
   await fallback.getByRole('button', { name: 'מתחילים לשחק' }).click(); await fallback.waitForTimeout(1000);
   assert(await fallback.evaluate(() => window.testGame.scene.getScene('GameScene').model.player.x >= 7));
   assert.deepEqual(fallbackErrors, []); await fallback.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, WebGL/Canvas territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, WebGL/Canvas fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }
