@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "build": "npm run typecheck && vite build && node scripts/portable.mjs",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/engine.test.ts",
+    "test:browser": "node tests/browser.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"
   },
   "devDependencies": {
+    "playwright": "1.64.0",
     "typescript": "7.0.2",
     "vite": "8.3.4"
+  },
+  "engines": {
+    "node": ">=24.0.0"
   }
 }

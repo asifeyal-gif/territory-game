@@ -1,34 +1,63 @@
-# Territory Game
+# טריטוריה · Territory
 
-A 2D browser game starter using Phaser, TypeScript, and Vite. Stage 1: a fully visible grid, a blue player and starting base, automatic movement after Start, arrow-key turns without reversal, three lives, a one-second recovery delay, restart, and pause while the tab is inactive. Movement speed is 86.4 pixels/second across an 864-pixel field (about ten seconds across the full width). No territory capture, opponent, or game clock is included. No external assets, credentials, or backend services are required.
+משחק כיבוש שטחים דו־ממדי בדפדפן, עם Phaser, TypeScript ו־Vite.
 
-## Requirements
+## הכי קל לשחק — ללא התקנה
 
-Node.js 22.12+ (24 recommended) and npm.
+1. ב־GitHub לחצו **Code → Download ZIP**.
+2. חלצו את הקובץ באמצעות **חלץ הכול**.
+3. פתחו את התיקייה ולחצו פעמיים על **play.html** (אם סיומת הקובץ מוסתרת, שמו יהיה **play**).
+4. המשחק נפתח בדפדפן. לחצו **מתחילים לשחק**.
 
-## Development
+הקובץ עצמאי: אין צורך בשרת, ב־Node.js או בחיבור לרשת כדי לשחק. כדי לעדכן, הורידו וחלצו שוב את הגרסה החדשה, ופתחו את `play.html` החדש. אם Windows פותח את הקובץ בתוכנה אחרת, השתמשו ב־**פתח באמצעות → Google Chrome / Microsoft Edge**.
+
+## איך משחקים
+
+- מתחילים בבסיס הכחול עם שלושה לבבות. השחקן נע אוטומטית; החצים או WASD משנים כיוון בגבול המשבצת. אי אפשר להסתובב מיד לאחור.
+- יציאה מהשטח הכחול משאירה שובל. חזרה לכחול סוגרת את המסלול: השובל וכל האזורים הסגורים שאין בהם יריב הופכים לשטח שלכם.
+- שני יריבים נעים בשטח הניטרלי ומוחזרים מגבולות ומהשטח הבטוח. מגע ביריב מחוץ לשטח הבטוח, חיתוך השובל שלכם על ידי יריב, חציית השובל של עצמכם או יציאה מהמגרש עולים בלב.
+- אחרי פסילה השובל נמחק, חוזרים לבסיס וממתינים שנייה. השטח שכבר נכבש נשמר. בפסילה השלישית המשחק נגמר.
+- כיבוש **65%** מהמגרש מנצח. ככל שהכיבוש מתקדם, היריבים מהירים מעט יותר.
+- כפתור ההשהיה או מקש רווח משהים וממשיכים. מעבר ללשונית אחרת או לחלון אחר מקפיא גם את היריבים וגם את ההתאוששות.
+- בטלפון אפשר להשתמש בכפתורי החצים או להחליק על המגרש.
+- **משחק מחדש** מאפס את הסיבוב. השיא נשמר בדפדפן כאשר האחסון המקומי זמין; חסימת אחסון לא מונעת משחק.
+- כפתור ♪ מפעיל צלילים קצרים. הצלילים כבויים כברירת מחדל.
+
+## פיתוח
+
+Node.js **24 ומעלה** ו־npm. אין צורך במפתחות, בשרת אחורי או בנכסים חיצוניים.
 
 ```sh
 npm ci
 npm run dev -- --port 5173 --strictPort
 ```
 
-Vite serves the application on port 5173 with hot module replacement and binds to all interfaces for cloud development.
-
-## Validation and production build
+שרת הפיתוח מאזין בכל הממשקים ותומך ברענון אוטומטי. במחשב מקומי פתחו `http://localhost:5173`, והשאירו את חלון המסוף פתוח.
 
 ```sh
-npm run typecheck
+npm test
 npm run build
 npm run preview -- --port 4173 --strictPort
 ```
 
-The build validates TypeScript and writes the static application to `dist/`. Preview serves that build on port 4173 for local validation. Deploy `dist/` to a static web host.
+הבנייה בודקת TypeScript, יוצרת אתר סטטי ב־`dist/`, ומעדכנת את `play.html` העצמאי בשורש המאגר. יש לכלול את `play.html` המעודכן בשמירה ל־GitHub. אפשר לפרסם את `dist/` אצל ספק אחסון סטטי. שרת preview מיועד לבדיקה מקומית.
 
-## Files
+## בדיקות דפדפן
 
-- `src/main.ts`: Phaser configuration and initial scene.
-- `src/style.css`: full-screen layout.
-- `index.html`: Vite entry point.
+```sh
+npx playwright install chromium
+npm run test:browser
+```
 
-Commit the dependency lockfile for repeatable installations. No automated gameplay test suite is configured yet.
+אם Chromium כבר מותקן ב־`/usr/bin/chromium`, הבדיקה משתמשת בו. אפשר לציין נתיב אחר דרך `CHROMIUM_PATH`. הבדיקה מפעילה בעצמה שרת זמני בפורט 5174, בודקת תנועה, מקשים, כיבוש, השהיה, פסילות, ניצחון ואיפוס, ושומרת צילומי מסך ב־`test-results/`. חלק מהמצבים מקודמים באופן דטרמיניסטי כדי לבדוק סיום משחק בלי להמתין לסיבוב שלם. נראות הלשונית מדומה בבדיקת ההשהיה. הקובץ העצמאי נבדק אחרי בנייה, כולל בקשות רשת וכפתור התחלה. בסביבת ענן שחוסמת כתובות file://, הבדיקה מריצה את אותו HTML באופן מוטמע וללא רשת; פתיחה ישירה של קובץ במחשב המשתמש נותרת בדיקה ידנית.
+
+## מבנה
+
+- `src/engine.ts` — חוקי המשחק, תנועה ברשת, יריבים וכיבוש באמצעות flood fill.
+- `src/main.ts` — ציור ב־Phaser, ממשק, שליטה, שמע והשהיה.
+- `src/style.css` — עיצוב והתאמה למסכים.
+- `tests/engine.test.ts` — בדיקות חוקי המשחק ללא דפדפן.
+- `tests/browser.mjs` — בדיקות Chromium.
+- `scripts/portable.mjs` — יצירת הקובץ העצמאי מהבנייה.
+
+רוחב המגרש הוא 36 משבצות, והמהירות 3.6 משבצות בשנייה: כעשר שניות לרוחב המלא. שינויי כיוון מיושרים לרשת והציור מוחלק בין צעדים. אין שעון משחק או הגבלת זמן. חבילת Phaser גדולה יחסית ולכן Vite עשוי להציג אזהרת גודל; הקובץ העצמאי כולל את כל החבילה בכוונה.
