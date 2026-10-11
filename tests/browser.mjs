@@ -37,6 +37,7 @@ try {
   await page.waitForTimeout(500);
   const threeColors = await page.evaluate(() => {
     const arena = window.scene.arena3d;
+    arena.renderer.render(arena.scene,arena.camera);
     const gl = arena.renderer.getContext();
     const pixels = [];
     for (const [x,z] of [[-15.5,.5],[11.5,.5],[0,.5]]) {
@@ -165,7 +166,7 @@ try {
   for (const size of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(size); await page.waitForTimeout(150);
     assert(await page.evaluate(() => {
-      const canvas = document.querySelector('canvas').getBoundingClientRect();
+      const canvas = document.querySelector('canvas.arena-3d').getBoundingClientRect();
       const controls = document.querySelector('footer').getBoundingClientRect();
       return canvas.top >= 0 && canvas.bottom <= innerHeight && canvas.left >= 0 && canvas.right <= innerWidth && controls.bottom <= innerHeight;
     }), `full board and footer visible at ${size.width}x${size.height}`);
@@ -204,7 +205,7 @@ try {
   const fallbackErrors = []; fallback.on('pageerror', error => fallbackErrors.push(error.message));
   await fallback.route('**/src/main.ts*', async route => {
     const response = await route.fetch();
-    const source = (await response.text()).replace('type: Phaser.AUTO', 'type: Phaser.CANVAS');
+    const source = await response.text();
     await route.fulfill({ response, body: `${source}\nwindow.testGame = game;` });
   });
   await fallback.route('**/src/arena3d.ts*', route => route.fulfill({ contentType: 'text/javascript', body: 'export class Arena3D { constructor() { throw new Error("Simulated unavailable WebGL"); } }' }));
@@ -216,8 +217,34 @@ try {
   await fallback.getByRole('button', { name: 'מתחילים לשחק' }).click(); await fallback.waitForTimeout(1000);
   assert(await fallback.evaluate(() => window.testGame.scene.getScene('GameScene').model.player.x >= 7));
   assert.deepEqual(fallbackErrors, []); await fallback.close();
+  // Exercise the full lighting tier once, even when Chromium reports a software GPU.
+  const quality = await browser.newPage({viewport:{width:1280,height:900}});
+  const qualityErrors=[]; quality.on('pageerror',error=>qualityErrors.push(error.message));
+  await quality.route('**/src/main.ts*',async route=>{
+    const response=await route.fetch();await route.fulfill({response,body:`${await response.text()}\nwindow.testGame=game;`});
+  });
+  await quality.goto(base);await quality.bringToFront();
+  await quality.waitForFunction(()=>window.testGame?.scene.getScene('GameScene')?.arena3d?.readyStarted);
+  await quality.getByRole('button',{name:'מתחילים לשחק'}).click();
+  const fullQuality=await quality.evaluate(()=>{
+    const s=window.testGame.scene.getScene('GameScene'),m=s.model,a=s.arena3d;
+    s.paused=true;m.reset();m.start();
+    for(let round=0;round<40&&m.rivalCaptures<2&&m.phase==='playing';round++){
+      for(const [direction,count] of [['right',2],['down',2],['left',2],['up',2]]){
+        m.turn(direction);for(let n=0;n<count;n++)m.tick(10000/36+.00001);
+      }
+    }
+    s.revision=m.revision;s.drawTerrain();s.renderHud();document.getElementById('overlay').hidden=true;
+    a.renderer.setPixelRatio(1);a.renderer.shadowMap.enabled=true;a.renderer.shadowMap.needsUpdate=true;
+    a.render(m,250,true);
+    return {environment:!!a.scene.environment,shadow:a.scene.children.some(light=>light.isDirectionalLight&&light.shadow?.map),tiles:a.tiles.count,land:m.owned.size+m.rivalOwned.size};
+  });
+  assert(fullQuality.environment&&fullQuality.shadow,'full quality generates environment reflections and a shadow map');
+  assert.equal(fullQuality.tiles,fullQuality.land,'only occupied terrain instances are drawn');
+  await quality.screenshot({path:'test-results/desktop-quality.png'});
+  assert.deepEqual(qualityErrors,[]);await quality.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, WebGL/Canvas fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier and compact terrain instances; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }

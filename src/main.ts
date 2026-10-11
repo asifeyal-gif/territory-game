@@ -80,7 +80,13 @@ class GameScene extends Phaser.Scene {
     const sync = () => { this.inactive = document.hidden || !document.hasFocus(); this.renderHud(); };
     document.addEventListener('visibilitychange', sync); window.addEventListener('blur', sync); window.addEventListener('focus', sync);
     this.events.once('shutdown', () => { document.removeEventListener('visibilitychange', sync); window.removeEventListener('blur', sync); window.removeEventListener('focus', sync); });
-    try { this.arena3d = new Arena3D(board); } catch (error) { console.info("3D unavailable; using the compatible 2D arena.", error); board.classList.remove("has-3d"); board.querySelector(".arena-3d")?.remove(); }
+    try {
+      this.arena3d = new Arena3D(board);
+      startButton.disabled=true;board.setAttribute("aria-busy","true");
+      this.arena3d.ready.then(()=>{startButton.disabled=false;board.removeAttribute("aria-busy");}).catch(()=>{
+        this.arena3d?.dispose();this.arena3d=undefined;board.classList.remove('has-3d');board.removeAttribute('aria-busy');startButton.disabled=false;
+      });
+    } catch (error) { console.info("3D unavailable; using the compatible 2D arena.", error); board.classList.remove("has-3d"); board.querySelector(".arena-3d")?.remove(); }
     this.events.once("shutdown", () => this.arena3d?.dispose());
     this.renderHud();
   }
@@ -248,7 +254,7 @@ class GameScene extends Phaser.Scene {
     const beforeBlue = new Set(m.owned), beforeRed = new Set(m.rivalOwned);
     const oldPlayer = { ...m.player }, oldRival = { ...m.rival };
     const active = !this.paused && !this.inactive;
-    const elapsed = Math.min(delta, 100);
+    const elapsed = Math.min(delta, 250);
     if (active) { m.tick(elapsed); if (m.phase === 'playing' || m.phase === 'recovering') this.visualTime += elapsed; }
     if (lives !== m.lives) { this.beep(140); this.burst(oldPlayer, BLUE); if (!this.reducedMotion) this.cameras.main.shake(100, .002); }
     if (captures !== m.captures) {
@@ -260,7 +266,7 @@ class GameScene extends Phaser.Scene {
     }
     if (redFailures !== m.rivalFailures) this.burst(oldRival, RED, [], '×');
     if (this.revision !== m.revision) { this.revision = m.revision; this.drawTerrain(); this.renderHud(); }
-    this.arena3d?.render(m, elapsed, active && m.phase === "playing");
+    this.arena3d?.render(m, elapsed, active && ["playing", "recovering"].includes(m.phase));
     const g = this.actors; g.clear();
     const interpolate = (from: Point, to: Point, fraction: number): Point => screenPoint({ x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction });
     const playerPoint = interpolate(m.previous, m.player, m.phase === 'playing' ? Math.min(1, m.progress / STEP_MS) : 1);
@@ -296,7 +302,7 @@ class GameScene extends Phaser.Scene {
   }
 }
 export const game = new Phaser.Game({
-  type: Phaser.AUTO, parent: 'board', width: WIDTH, height: HEIGHT,
+  type: Phaser.CANVAS, parent: 'board', width: WIDTH, height: HEIGHT,
   backgroundColor: '#102538', antialias: true, pixelArt: false, fps: { smoothStep: false },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, scene: GameScene,
 });
