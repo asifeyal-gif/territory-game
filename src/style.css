@@ -97,3 +97,13 @@ footer { gap: 16px; padding: 0 3px; }
 body { background: radial-gradient(ellipse at 18% 0%, #233e52, transparent 55%), radial-gradient(ellipse at 92% 90%, #392637, transparent 55%), #09131f; }
 .arena { background: #0c1b2b; box-shadow: 0 25px 80px #0005, inset 0 1px 0 #ffffff12; }
 .arena-label { color: #83c9dd; }
+.missionbar { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; }
+.missionbar > div { display:flex; align-items:center; gap:12px; }
+#level { font-size:16px; color:#c7ecfc; }
+#pressure { color:#d2a67b; padding:4px 9px; border-radius:8px; background:#ffffff05; }
+.scoreboard { color:#9bb2c4; } #score { color:#e5f3fc; font-variant-numeric:tabular-nums; } #combo { color:#80d7eb; }
+.shield-button { border:1px solid #72d9f73d; background:#28526870; color:#b6edff; padding:8px 12px; border-radius:10px; }
+.shield-button strong { margin-right:6px; } .shield-active { background:#43899a; color:white; }
+@media(max-width:600px){ .missionbar{gap:5px;font-size:10px;} .missionbar > div{gap:5px;} #level{font-size:13px;} .shield-button{padding:7px 8px;} .best-badge{display:inline;font-size:9px;} .header-actions{gap:7px;} #pressure{padding:3px 5px;} }
+@media(max-height:600px){ .missionbar{font-size:10px;} #level{font-size:12px;} .shield-button{padding:4px 8px;} }
+.duel-emblem .trophy-emblem { width:68px; height:68px; font-size:45px; background:#dfb35818; border-color:#e1c57f44; transform:none; }

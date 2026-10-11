@@ -30,7 +30,7 @@ try {
   await page.evaluate(() => window.scene = window.testGame.scene.getScene('GameScene'));
   const state = () => page.evaluate(() => {
     const m = window.scene.model;
-    return { player: m.player, direction: m.direction, queued: m.queued, phase: m.phase, lives: m.lives, owned: m.owned.size, captures: m.captures, progress: m.progress, recovery: m.recovery, enemyClock: m.enemyClock, enemies: m.enemies, rival: m.rival, rivalOwned: m.rivalOwned.size, rivalTrail: m.rivalTrail, rivalClock: m.rivalClock, rivalRecovery: m.rivalRecovery, rivalCaptures: m.rivalCaptures, visualTime: window.scene.arena3d?.time };
+    return { player: m.player, direction: m.direction, queued: m.queued, phase: m.phase, lives: m.lives, owned: m.owned.size, captures: m.captures, progress: m.progress, recovery: m.recovery, enemyClock: m.enemyClock, enemies: m.enemies, rival: m.rival, rivalOwned: m.rivalOwned.size, rivalTrail: m.rivalTrail, rivalClock: m.rivalClock, rivalRecovery: m.rivalRecovery, rivalCaptures: m.rivalCaptures, visualTime: window.scene.arena3d?.time, level:m.level,trophies:m.trophies,score:m.score,combo:m.combo,shieldCharges:m.shieldCharges,shieldRemaining:m.shieldRemaining,rivalMode:m.rivalMode,rivalWarning:m.rivalWarning,reinforcement:m.reinforcement,reinforcementDelay:m.reinforcementDelay };
   });
   await mkdir('test-results', { recursive: true });
   await page.waitForSelector('canvas.arena-3d');
@@ -83,6 +83,7 @@ try {
   await page.keyboard.press('ArrowUp'); await page.waitForTimeout(350); assert.equal((await state()).direction, 'up');
   await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100); assert.equal((await state()).queued, 'up');
   assert.equal(await page.evaluate(() => scrollY), 0);
+  await page.keyboard.press('KeyE');assert((await state()).shieldRemaining>0);assert.equal((await state()).shieldCharges,0);assert.match(await page.locator('#charges').innerText(),/פעיל/);
   await page.getByRole('button', { name: 'השהיה', exact: true }).click();
   const paused = await state(); await page.waitForTimeout(400); assert.deepEqual(await state(), paused);
   await page.getByRole('button', { name: 'המשך', exact: true }).click();
@@ -155,9 +156,23 @@ try {
   assert.match(await page.locator('#overlay-title').innerText(), /נגמרו הלבבות/);
   await page.getByRole('button', { name: 'עוד סיבוב' }).click(); assert.equal((await state()).lives, 3);
   await page.evaluate(() => { const m = window.scene.model; for (let i = 0; m.owned.size < 565 && i < 864; i++) if (!m.rivalOwned.has(i) && !m.enemies.some(e => e.y * 36 + e.x === i)) m.owned.add(i); m.trail = [{ x: 1, y: 23 }]; m.capture(); });
-  await page.waitForTimeout(100); assert.equal((await state()).phase, 'won'); assert.match(await page.locator('#overlay-title').innerText(), /המגרש שלכם/);
+  await page.waitForTimeout(100); assert.equal((await state()).phase, 'won'); assert.match(await page.locator('#overlay-title').innerText(), /ניצחתם את שלב/);
   await page.screenshot({ path: 'test-results/desktop-win.png' });
+  assert.equal((await state()).trophies,1);assert.equal(await page.locator('#trophies').innerText(),'1');
+  const wonScore=(await state()).score;
+  await page.getByRole('button',{name:'לשלב 2'}).click();
+  assert.equal((await state()).level,2);assert.equal((await state()).phase,'playing');assert.equal((await state()).score,wonScore);
+  assert.match(await page.locator('#target-note').innerText(),/67%/);assert.equal((await state()).lives,3);
+  await page.evaluate(()=>{const m=window.scene.model;for(let i=0;i<3;i++){m.fail('בדיקת שלב');if(i<2)m.tick(1000);}});
+  await page.waitForTimeout(100);await page.getByRole('button',{name:'עוד סיבוב'}).click();
+  assert.equal((await state()).level,2);assert.equal((await state()).trophies,1);
+
   await page.getByRole('button', { name: 'משחק מחדש', exact: true }).click();
+  assert.equal((await state()).level,1);assert.equal((await state()).trophies,1);
+  await page.reload();await page.bringToFront();
+  await page.waitForFunction(()=>window.testGame?.scene.getScene('GameScene')?.model);
+  await page.evaluate(()=>window.scene=window.testGame.scene.getScene('GameScene'));
+  assert.equal((await state()).trophies,1,'trophy collection persists after reloading');
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(150);
   await page.screenshot({ path: 'test-results/mobile-start.png' });
   await page.getByRole('button', { name: 'מתחילים לשחק' }).click();
@@ -244,7 +259,7 @@ try {
   await quality.screenshot({path:'test-results/desktop-quality.png'});
   assert.deepEqual(qualityErrors,[]);await quality.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier and compact terrain instances; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }

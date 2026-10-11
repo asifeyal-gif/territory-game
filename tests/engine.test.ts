@@ -63,8 +63,8 @@ test('65 percent territory wins and no movement occurs after victory', () => {
   const player = { ...game.player }; game.tick(1000); assert.deepEqual(game.player, player);
 });
 
-test('a complete duel can be won against an active capturing CPU and moving hazards without losing lives', () => {
-  const game = playing();
+test('the relaxed duel preserves a complete successful capture route', () => {
+  const game = new TerritoryGame('relaxed');game.start();
   const loops = [
     [['right', 12], ['up', 12], ['left', 12], ['down', 12]],
     [['down', 8], ['right', 12], ['up', 8], ['left', 12]],
@@ -171,4 +171,79 @@ test('a head-on collision in neutral territory penalizes both sides fairly', () 
   game.step(); assert.equal(game.lives, 2); assert.equal(game.rivalFailures, 1);
   assert.equal(game.phase, 'recovering'); assert.deepEqual(game.rival, { x: 31, y: 12 });
   assert.match(game.message, /התנגשתם/);
+});
+
+test('victory awards exactly one trophy and opens a harder fresh level with cumulative score', () => {
+  const game=playing();const originalInterval=game.rivalInterval;
+  for(let id=0;game.owned.size<565&&id<COLS*ROWS;id++)if(!game.rivalOwned.has(id)&&!game.enemies.some(e=>index(e)===id))game.owned.add(id);
+  game.trail=[{x:1,y:23}];game.capture();assert.equal(game.trophies,1);assert.equal(game.phase,'won');
+  game.capture();assert.equal(game.trophies,1,'duplicate capture cannot award another trophy');
+  const score=game.score;assert(game.nextLevel());assert.equal(game.level,2);assert.equal(game.target,67);
+  assert.equal(game.phase,'playing');assert.equal(game.lives,3);assert.equal(game.owned.size,25);assert.equal(game.score,score);assert(game.rivalInterval<originalInterval);
+  assert(!game.nextLevel());game.fail('בדיקה');game.tick(1000);game.fail('בדיקה');game.tick(1000);game.fail('בדיקה');
+  assert.equal(game.phase,'lost');game.reset();assert.equal(game.level,2);assert.equal(game.score,score);assert.equal(game.trophies,1);
+  game.restartCampaign();assert.equal(game.level,1);assert.equal(game.score,0);assert.equal(game.trophies,1,'earned trophy collection survives a new campaign');
+});
+test('a shield protects an exposed trail for three seconds and does not protect against boundaries', () => {
+  const game=playing();game.trail=[{x:11,y:3}];game.enemies=[{x:10,y:3,dx:1,dy:1}];
+  assert(game.activateShield());assert.equal(game.shieldCharges,0);assert(!game.activateShield());
+  game.moveEnemies();assert.equal(game.lives,3);assert.equal(game.trail.length,1);
+  const paused=game.shieldRemaining;game.phase='recovering';game.recovery=1000;game.tick(999);assert.equal(game.shieldRemaining,paused);
+  game.phase='playing';game.trail=[];game.rivalRecovery=5000;game.tick(3000);assert.equal(game.shieldRemaining,0);
+  game.shieldCharges=1;assert(game.activateShield());game.player={x:35,y:12};game.direction=game.queued='right';game.step();assert.equal(game.lives,2);
+});
+test('CPU telegraphs a reachable trail hunt, follows legal steps and abandons it when the trail is protected', () => {
+  const game=playing();game.enemies=[];game.rival={x:15,y:12};game.rivalPrevious={...game.rival};game.rivalDirection='left';
+  game.player={x:9,y:8};game.trail=Array.from({length:6},(_,n)=>({x:9,y:9+n}));
+  const before={...game.rival};game.moveRival();assert.equal(game.rivalMode,'hunt');assert(game.rivalWarning>0);assert.deepEqual(game.rival,before,'warning gives a reaction window');
+  game.rivalWarning=0;game.moveRival();assert.equal(Math.abs(game.rival.x-before.x)+Math.abs(game.rival.y-before.y),1);
+  assert(game.activateShield());game.moveRival();assert.notEqual(game.rivalMode,'hunt');assert.equal(game.lives,3);
+});
+test('reinforcements are announced, avoid safe land and heads, and higher levels start with more hazards', () => {
+  const game=playing();game.rivalRecovery=10000;
+  for(let id=0;game.owned.size<310&&id<COLS*ROWS;id++)if(!game.rivalOwned.has(id)&&!game.enemies.some(e=>index(e)===id))game.owned.add(id);
+  game.tick(1);assert(game.reinforcement);assert.equal(game.enemies.length,2);assert(game.reinforcementDelay>1400);
+  const warning={...game.reinforcement};game.tick(1499);assert.equal(game.enemies.length,3);assert(!game.owned.has(index(warning)));assert.equal(game.reinforcement,undefined);
+  game.level=5;game.reset();assert.equal(game.enemies.length,4);assert.equal(game.target,73);
+});
+test('consecutive successful captures multiply score and recharge shields; a failure breaks the chain', () => {
+  const game=playing();game.shieldCharges=0;game.enemies=[];
+  for(let n=0;n<3;n++){
+    // Each explicit boundary closes a real 2x3 neutral rectangle.
+    const x=9+n*4;game.trail=[];
+    for(let y=2;y<=5;y++){game.trail.push({x,y});game.trail.push({x:x+2,y});}
+    game.trail.push({x:x+1,y:2},{x:x+1,y:5});game.capture();
+  }
+  assert.equal(game.combo,3);assert.equal(game.shieldCharges,1);assert(game.score>360);
+  game.fail('בדיקה');assert.equal(game.combo,0);assert(game.score>0);
+});
+test('shield expiry and reinforcement timing remain identical across different frame sizes', () => {
+  const setup=()=>{const g=playing();g.rivalRecovery=10000;for(let id=0;g.owned.size<310&&id<COLS*ROWS;id++)if(!g.rivalOwned.has(id)&&!g.enemies.some(e=>index(e)===id))g.owned.add(id);g.activateShield();return g;};
+  const large=setup(),small=setup();large.tick(3000);for(let n=0;n<60;n++)small.tick(50);
+  assert.deepEqual(large.enemies,small.enemies);assert.deepEqual(large.player,small.player);assert(Math.abs(large.shieldRemaining-small.shieldRemaining)<.0001);assert(large.shieldRemaining<.0001);
+  assert.equal(large.enemies.length,3);assert.equal(large.reinforcement,undefined);
+});
+test('a competitive campaign level is winnable through legal movement and timely shields against a hunting CPU', () => {
+  const game=playing();let shields=0,hunts=0;
+  const routes=[
+    [['right',12],['up',11],['left',12],['down',11]],
+    [['down',11],['right',12],['up',11],['left',12]],
+    [['up',3],['right',22],['down',3],['left',22]],
+    [['down',5],['right',22],['up',5],['left',22]],
+    [['down',11],['right',22],['up',11],['left',22]],
+    [['down',1],['right',14],['down',5],['right',11],['up',11],['left',11],['down',11]],
+    [['right',5],['up',7],['right',1],['down',1],['right',11],['down',5],['left',11],['up',5]],
+  ] as const;
+  const distance=(a:{x:number;y:number},b:{x:number;y:number})=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+  for(const route of routes)for(const [direction,count] of route){
+    if(game.phase==='won')break;game.turn(direction);
+    for(let frame=0;frame<count*5&&game.phase==='playing';frame++){
+      if(game.trail.some(p=>game.enemies.some(e=>distance(e,p)<=2)||(game.rivalMode==='hunt'&&distance(game.rival,p)<=4))&&game.activateShield())shields++;
+      game.tick((STEP_MS+.00001)/5);if(game.rivalMode==='hunt')hunts++;
+    }
+    assert.equal(game.lives,3);
+  }
+  assert.equal(game.phase,'won');assert(game.percent>=game.target);assert.equal(game.trophies,1);
+  assert(hunts>0);assert(shields>0);assert(game.rivalCaptures>0);assert.equal(game.enemies.length,3);
+  assert(game.nextLevel());assert.equal(game.level,2);assert.equal(game.owned.size,25);assert(game.score>1000);
 });

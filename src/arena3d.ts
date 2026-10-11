@@ -26,6 +26,8 @@ export class Arena3D {
   private water: T.ShaderMaterial;
   private ships: T.Group[] = [];
   private mines: T.Group[] = [];
+  private shieldRing: T.Mesh;
+  private warningRing: T.Mesh;
   private trails: T.Mesh[][] = [[], []];
   private matrix = new T.Object3D();
   private heights = new Float32Array(COLS * ROWS);
@@ -104,7 +106,7 @@ export class Arena3D {
       const ctx=canvas.getContext('2d')!;ctx.font='bold 25px Arial';ctx.textAlign='center';ctx.fillStyle=n?'#ffc3cd':'#b9f4ff';ctx.shadowColor='#091a29';ctx.shadowBlur=8;ctx.fillText(n?'CPU':'YOU',64,33);
       const label=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(canvas),depthTest:false,transparent:true}));label.scale.set(1.2,.45,1);label.position.y=.8;ship.add(label);
     }
-    for (let n = 0; n < 2; n++) {
+    for (let n = 0; n < 4; n++) {
       const mine = new T.Group(); this.scene.add(mine);
       this.mesh(new T.SphereGeometry(.23, 20, 12), this.material(0x27343b, .85, .23), mine);
       const ring = this.mesh(new T.TorusGeometry(.3, .045, 8, 32), this.material(0xd6a051, .7, .22), mine); ring.rotation.x = Math.PI/2;
@@ -115,6 +117,8 @@ export class Arena3D {
       }
       this.mines.push(mine);
     }
+    this.shieldRing=this.mesh(new T.TorusGeometry(.7,.025,8,48),new T.MeshBasicMaterial({color:0x79e9ff,transparent:true,opacity:.85}),this.ships[0]);this.shieldRing.rotation.x=Math.PI/2;this.shieldRing.visible=false;
+    this.warningRing=this.mesh(new T.TorusGeometry(.55,.04,8,40),new T.MeshBasicMaterial({color:0xffc270}),this.scene);this.warningRing.rotation.x=-Math.PI/2;this.warningRing.visible=false;
     this.observer=new ResizeObserver(()=>this.resize(board));this.observer.observe(board);this.resize(board);
     this.ready=new Promise(resolve=>{this.resolveReady=resolve;});
   }
@@ -290,7 +294,7 @@ export class Arena3D {
     this.padRings.forEach((ring,n)=>{(ring.material as T.MeshBasicMaterial).color.set(n?0xff718e:0x70ddf4);});
     const playing=m.phase==='playing';
     const p=this.position(m.previous,m.player,playing?Math.min(1,m.progress/STEP_MS):1);
-    const r=this.position(m.rivalPrevious,m.rival,playing&&!m.rivalRecovery?Math.min(1,m.rivalClock/RIVAL_STEP_MS):1);
+    const r=this.position(m.rivalPrevious,m.rival,playing&&!m.rivalRecovery?Math.min(1,m.rivalClock/m.rivalInterval):1);
     const directions:Record<Direction,number>={up:0,right:-Math.PI/2,down:Math.PI,left:Math.PI/2};
     [p,r].forEach((pos,n)=> {
       const ship=this.ships[n];ship.position.set(pos.x,1.4+Math.sin(this.time*3+n)*.035,pos.z);
@@ -299,6 +303,10 @@ export class Arena3D {
       ship.visible=!(n?m.rivalRecovery:m.phase==='recovering')||Math.floor(this.time*8)%2===0;
     });
     this.trail(0,m.trail,m.trailOrigin,p);this.trail(1,m.rivalTrail,m.rivalTrailOrigin,r);
+    this.shieldRing.visible=m.shieldRemaining>0;
+    this.warningRing.visible=!!m.reinforcement;
+    if(m.reinforcement){this.warningRing.position.set(m.reinforcement.x-COLS/2+.5,.12,m.reinforcement.y-ROWS/2+.5);this.warningRing.scale.setScalar(1+Math.sin(this.time*8)*.12);}
+    this.mines.forEach((mine,n)=>{mine.visible=n<m.enemies.length;});
     m.enemies.forEach((enemy,n)=> {const p=this.position(m.enemyPrevious[n]||enemy,enemy,playing?Math.min(1,m.enemyClock/m.enemyInterval):1);const mine=this.mines[n];mine.position.set(p.x,.65+Math.sin(this.time*2+n)*.08,p.z);mine.rotation.y=this.time*.5;});
     if(this.time-this.shadowTime>.18 || this.lastRevision!==m.revision || this.needsRender) {
       this.renderer.shadowMap.needsUpdate=true;this.shadowTime=this.time;

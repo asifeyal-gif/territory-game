@@ -6,16 +6,17 @@ import './style.css';
 const root = document.querySelector<HTMLDivElement>('#game')!;
 root.innerHTML = `
 <main class="shell" dir="rtl">
-  <header class="topbar"><div class="brand"><span class="brand-icon">◈</span><div><h1>טריטוריה<span> DUEL</span></h1><p>שני כובשים. מגרש אחד.</p></div></div><div class="header-actions"><span class="best-badge">שיא אישי <strong id="best">0%</strong></span><button id="sound" class="icon-button" aria-label="הפעל צלילים" aria-pressed="false">♪</button></div></header>
+  <header class="topbar"><div class="brand"><span class="brand-icon">◈</span><div><h1>טריטוריה<span> DUEL</span></h1><p>שני כובשים. מגרש אחד.</p></div></div><div class="header-actions"><span class="best-badge">🏆 <strong id="trophies">0</strong> גביעים · שיא <strong id="best">0%</strong></span><button id="sound" class="icon-button" aria-label="הפעל צלילים" aria-pressed="false">♪</button></div></header>
   <section class="dashboard" aria-label="מצב המשחק">
-    <div class="territory-stat player-stat"><div class="stat-line"><span><i class="team-icon"></i> אתם</span><strong id="percent">0%</strong></div><div class="progress"><div id="progress"></div></div><small>הראשון שכובש ${TARGET}% מנצח</small></div>
+    <div class="territory-stat player-stat"><div class="stat-line"><span><i class="team-icon"></i> אתם</span><strong id="percent">0%</strong></div><div class="progress"><div id="progress"></div></div><small id="target-note">הראשון שכובש ${TARGET}% מנצח</small></div>
     <div class="territory-stat rival-stat"><div class="stat-line"><span><i class="team-icon"></i> המחשב</span><strong id="rival-percent">0%</strong></div><div class="progress"><div id="rival-progress"></div></div><small id="rival-status">מוכן לצאת מהבסיס</small></div>
     <div class="stat"><span>חיים</span><div id="lives" class="lives" role="img"></div></div>
   </section>
+  <section class="missionbar" aria-label="התקדמות בשלבים"><div><strong id="level">שלב 1</strong><span id="pressure">פתיחה</span></div><div class="scoreboard"><span>ניקוד <strong id="score">0</strong></span><span id="combo">רצף ×1</span></div><button id="shield" class="shield-button" disabled>מגן · E <strong id="charges">1</strong></button></section>
   <section class="arena"><div class="arena-top"><div class="legend"><span><i class="dot"></i> השטח שלכם</span><span class="enemy-legend"><i class="dot"></i> המחשב כובש באדום</span><span class="hazard-legend"><i class="dot"></i> מוקשי אנרגיה</span></div><span class="arena-label">LIVE ARENA <i></i></span></div>
-    <div id="board" aria-label="מגרש המשחק"><div id="overlay" class="overlay"><div class="overlay-card"><div class="duel-emblem"><span>◈</span><i>×</i><span>◈</span></div><span id="eyebrow">השטח הבא שלכם</span><h2 id="overlay-title">כובשים. חותכים. מנצחים.</h2><p id="overlay-description"></p><button id="start" class="primary">מתחילים לשחק ←</button><p class="overlay-note">חצים או WASD · אפשר גם במגע · 3 לבבות</p></div></div></div>
+    <div id="board" aria-label="מגרש המשחק"><div id="overlay" class="overlay"><div class="overlay-card"><div class="duel-emblem"><span>◈</span><i>×</i><span>◈</span></div><span id="eyebrow">השטח הבא שלכם</span><h2 id="overlay-title">כובשים. חותכים. מנצחים.</h2><p id="overlay-description"></p><button id="start" class="primary">מתחילים לשחק ←</button><p class="overlay-note">חצים / WASD · מגן: E · כל ניצחון = גביע ושלב חדש</p></div></div></div>
   </section>
-  <footer><div><p id="status" role="status" aria-live="polite">מוכנים לתחרות?</p><p class="hint">חזרו לכחול כדי לכבוש · חתכו שובל אדום כדי לעצור את המחשב · אל תחצו את שלכם</p></div><div class="actions"><button id="pause" class="secondary" disabled>השהיה</button><button id="restart" class="secondary">משחק מחדש</button></div></footer>
+  <footer><div><p id="status" role="status" aria-live="polite">מוכנים לתחרות?</p><p class="hint">סגרו מסלולים לצבירת ניקוד ומגנים · מגן E מציל שובל בסכנה · ניצחון פותח שלב</p></div><div class="actions"><button id="pause" class="secondary" disabled>השהיה</button><button id="restart" class="secondary">משחק מחדש</button></div></footer>
   <nav class="touch-controls" aria-label="כיווני תנועה"><button data-direction="left" aria-label="שמאלה">←</button><div><button data-direction="up" aria-label="למעלה">↑</button><button data-direction="down" aria-label="למטה">↓</button></div><button data-direction="right" aria-label="ימינה">→</button></nav>
 </main>`;
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -45,11 +46,12 @@ class GameScene extends Phaser.Scene {
   private paused = false;
   private inactive = document.hidden || !document.hasFocus();
   private best = 0;
+  private savedTrophies = 0;
   private audioEnabled = false;
   private audio?: AudioContext;
   constructor() { super('GameScene'); }
   create(): void {
-    try { this.best = Number(localStorage.getItem('territory-best')) || 0; } catch { /* Storage can be unavailable. */ }
+    try { this.best = Number(localStorage.getItem('territory-best')) || 0;const bank=Number(localStorage.getItem('territory-trophies'));this.model.trophies=Number.isFinite(bank)?Math.max(0,Math.floor(bank)):0;this.savedTrophies=this.model.trophies; } catch { /* Storage can be unavailable. */ }
     this.createOcean();
     this.terrain = this.add.graphics(); this.actors = this.add.graphics();
     this.playerLabel = this.add.text(0, 0, 'YOU', { fontFamily: 'Arial', fontSize: '9px', fontStyle: 'bold', color: '#a5f1ff' }).setOrigin(.5).setDepth(5);
@@ -59,10 +61,12 @@ class GameScene extends Phaser.Scene {
       const mapping: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', a: 'left', d: 'right', w: 'up', s: 'down' };
       const direction = mapping[event.key] || mapping[event.key.toLowerCase()];
       if (direction) this.turn(direction);
+      if(event.code==='KeyE'&&!event.repeat)this.shield();
       if (event.code === 'Space' && !event.repeat) { event.preventDefault(); if (this.model.phase === 'ready') this.start(); else this.togglePause(); }
     });
     startButton.onclick = () => this.start();
-    element<HTMLButtonElement>('restart').onclick = () => { this.model.reset(); this.clearBursts(); this.paused = false; this.revision = -1; this.renderHud(); };
+    element<HTMLButtonElement>('restart').onclick = () => { this.model.restartCampaign(); this.clearBursts(); this.paused = false; this.revision = -1; this.renderHud(); };
+    element<HTMLButtonElement>('shield').onclick=()=>this.shield();
     pauseButton.onclick = () => this.togglePause();
     soundButton.onclick = () => { this.audioEnabled = !this.audioEnabled; soundButton.setAttribute('aria-pressed', String(this.audioEnabled)); soundButton.setAttribute('aria-label', this.audioEnabled ? 'כבה צלילים' : 'הפעל צלילים'); if (this.audioEnabled) this.beep(440); };
     document.querySelectorAll<HTMLButtonElement>('[data-direction]').forEach(button => {
@@ -92,8 +96,12 @@ class GameScene extends Phaser.Scene {
   }
   private turn(direction: Direction): void { if (!this.paused && !this.inactive) this.model.turn(direction); }
   private start(): void {
-    if (this.model.phase === 'won' || this.model.phase === 'lost') { this.model.reset(); this.clearBursts(); }
+    if(this.model.phase==='ready'&&startButton.disabled)return;
+    if(this.model.phase==='won'){this.model.nextLevel();this.clearBursts();}else if(this.model.phase==='lost'){this.model.reset();this.clearBursts();}
     this.paused = false; this.model.start(); this.beep(520); this.renderHud();
+  }
+  private shield(): void {
+    if(!this.paused&&!this.inactive&&this.model.activateShield()){this.beep(620);this.renderHud();}
   }
   private togglePause(): void {
     if (!['playing', 'recovering'].includes(this.model.phase)) return;
@@ -111,11 +119,21 @@ class GameScene extends Phaser.Scene {
   }
   private renderHud(): void {
     const m = this.model;
+    element('level').textContent=`שלב ${m.level}`;
+    element('pressure').textContent=['פתיחה','לחץ עולה','מצור','הכרעה'][m.pressure];
+    element('score').textContent=m.score.toLocaleString('he-IL');
+    element('combo').textContent=`רצף ×${Math.max(1,Math.min(5,m.combo))}`;
+    element('trophies').textContent=String(m.trophies);
+    if(m.trophies!==this.savedTrophies){this.savedTrophies=m.trophies;try{localStorage.setItem('territory-trophies',String(m.trophies));}catch{/* Optional storage. */}}
+    element('target-note').textContent=`הראשון שכובש ${m.target}% מנצח`;
+    const shield=element<HTMLButtonElement>('shield');shield.disabled=this.paused||this.inactive||m.phase!=='playing'||!m.shieldCharges||m.shieldRemaining>0;
+    shield.classList.toggle('shield-active',m.shieldRemaining>0);
+    element('charges').textContent=m.shieldRemaining>0?'פעיל':String(m.shieldCharges);
     element('percent').textContent = `${m.percent.toFixed(1)}%`;
-    element('progress').style.width = `${Math.min(100, m.percent / TARGET * 100)}%`;
+    element('progress').style.width = `${Math.min(100, m.percent / m.target * 100)}%`;
     element('rival-percent').textContent = `${m.rivalPercent.toFixed(1)}%`;
-    element('rival-progress').style.width = `${Math.min(100, m.rivalPercent / TARGET * 100)}%`;
-    element('rival-status').textContent = m.phase === 'ready' ? 'מוכן לצאת מהבסיס' : m.rivalRecovery > 0 ? 'השובל נחתך — חוזר לבסיס' : m.rivalTrail.length ? 'סוגר מסלול וכובש שטח' : 'מתכנן את הכיבוש הבא';
+    element('rival-progress').style.width = `${Math.min(100, m.rivalPercent / m.target * 100)}%`;
+    element('rival-status').textContent = m.phase === 'ready' ? 'מוכן לצאת מהבסיס' : m.rivalMode==='hunt' ? 'מכוון לשובל שלכם — סגרו מסלול!' : m.rivalRecovery > 0 ? 'השובל נחתך — חוזר לבסיס' : m.rivalTrail.length ? 'סוגר מסלול וכובש שטח' : 'מתכנן את הכיבוש הבא';
     if (m.percent > this.best) { this.best = m.percent; try { localStorage.setItem('territory-best', String(this.best)); } catch { /* Optional storage. */ } }
     element('best').textContent = `${this.best.toFixed(1)}%`;
     element('lives').innerHTML = Array.from({ length: 3 }, (_, i) => `<span class="${i < m.lives ? '' : 'lost'}" aria-hidden="true">♥</span>`).join('');
@@ -125,10 +143,11 @@ class GameScene extends Phaser.Scene {
     startButton.hidden = this.inactive && m.phase !== 'ready' && !finished;
     pauseButton.disabled = !['playing', 'recovering'].includes(m.phase);
     pauseButton.textContent = this.paused ? 'המשך' : 'השהיה';
-    element('eyebrow').textContent = finished ? m.phase === 'won' ? 'המשימה הושלמה' : 'כל מסלול מלמד משהו' : 'כובשים בדרך שלכם';
-    element('overlay-title').textContent = finished ? m.phase === 'won' ? 'המגרש שלכם!' : m.rivalPercent >= TARGET ? 'המחשב הקדים אתכם.' : 'נגמרו הלבבות.' : this.paused || this.inactive ? 'לוקחים נשימה.' : 'כובשים. חותכים. מנצחים.';
-    element('overlay-description').textContent = finished ? `אתם: ${m.percent.toFixed(1)}% · המחשב: ${m.rivalPercent.toFixed(1)}%. ${m.phase === 'won' ? 'המגרש שלכם!' : m.message} מוכנים לסיבוב נוסף?` : this.paused ? 'לחצו על ממשיכים או על מקש רווח כדי לחזור למשחק.' : this.inactive ? 'המשחק נעצר אוטומטית. חזרו ללשונית כדי להמשיך.' : 'צאו מהכחול וחזרו אליו כדי לכבוש. המחשב עושה אותו דבר באדום! חתכו את השובל שלו, והגיעו ל־65% לפניו.';
-    startButton.textContent = finished ? 'עוד סיבוב ←' : this.paused ? 'ממשיכים ←' : 'מתחילים לשחק ←';
+    document.querySelector('.duel-emblem')!.innerHTML=finished&&m.phase==='won'?'<span class="trophy-emblem">🏆</span>':'<span>◈</span><i>×</i><span>◈</span>';
+    element('eyebrow').textContent = finished ? m.phase === 'won' ? `🏆 גביע ${m.trophies} — שלב ${m.level+1} נפתח` : 'כל מסלול מלמד משהו' : 'כובשים בדרך שלכם';
+    element('overlay-title').textContent = finished ? m.phase === 'won' ? `ניצחתם את שלב ${m.level}!` : m.rivalPercent >= m.target ? 'המחשב הקדים אתכם.' : 'נגמרו הלבבות.' : this.paused || this.inactive ? 'לוקחים נשימה.' : 'כובשים. חותכים. מנצחים.';
+    element('overlay-description').textContent = finished ? `אתם: ${m.percent.toFixed(1)}% · המחשב: ${m.rivalPercent.toFixed(1)}%. ${m.phase === 'won' ? 'המגרש שלכם!' : m.message} מוכנים לסיבוב נוסף?` : this.paused ? 'לחצו על ממשיכים או על מקש רווח כדי לחזור למשחק.' : this.inactive ? 'המשחק נעצר אוטומטית. חזרו ללשונית כדי להמשיך.' : `שלב ${m.level}: הגיעו ל־${m.target}% לפני המחשב. מסלול ארוך מושך התקפה! מגן E נותן 3 שניות הגנה. כל ניצחון מעניק גביע ופותח שלב קשה יותר.`;
+    startButton.textContent = finished ? m.phase==='won'?`לשלב ${m.level+1} ←`:`עוד סיבוב — שלב ${m.level} ←` : this.paused ? 'ממשיכים ←' : 'מתחילים לשחק ←';
     element('status').textContent = m.phase === 'recovering' ? `${m.message} חוזרים לבסיס בעוד שנייה.` : m.phase === 'ready' ? 'מוכנים לתחרות על המגרש?' : this.paused || this.inactive ? 'המשחק מושהה.' : m.message;
   }
   private createOcean(): void {
@@ -270,7 +289,7 @@ class GameScene extends Phaser.Scene {
     const g = this.actors; g.clear();
     const interpolate = (from: Point, to: Point, fraction: number): Point => screenPoint({ x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction });
     const playerPoint = interpolate(m.previous, m.player, m.phase === 'playing' ? Math.min(1, m.progress / STEP_MS) : 1);
-    const rivalPoint = interpolate(m.rivalPrevious, m.rival, m.phase === 'playing' && !m.rivalRecovery ? Math.min(1, m.rivalClock / RIVAL_STEP_MS) : 1);
+    const rivalPoint = interpolate(m.rivalPrevious, m.rival, m.phase === 'playing' && !m.rivalRecovery ? Math.min(1, m.rivalClock / m.rivalInterval) : 1);
     this.drawTrail(m.trail, playerPoint, BLUE, m.trailOrigin); this.drawTrail(m.rivalTrail, rivalPoint, RED, m.rivalTrailOrigin);
     m.enemies.forEach((enemy, n) => {
       const p = interpolate(m.enemyPrevious[n] || enemy, enemy, m.phase === 'playing' ? Math.min(1, m.enemyClock / m.enemyInterval) : 1);
@@ -281,6 +300,8 @@ class GameScene extends Phaser.Scene {
       g.fillStyle(0xffbb72).fillCircle(p.x, p.y, 4);
       g.fillStyle(0xffefcf).fillCircle(p.x - 1, p.y - 1, 1.7);
     });
+    if(m.shieldRemaining>0)g.lineStyle(2,BLUE,.8).strokeCircle(playerPoint.x,playerPoint.y,19);
+    if(m.reinforcement){const p=screenPoint(m.reinforcement);g.lineStyle(2,0xffbd71,.85).strokeCircle(p.x,p.y,16);g.lineBetween(p.x-6,p.y,p.x+6,p.y);}
     this.drawShip(playerPoint, m.direction, BLUE, m.phase === 'recovering');
     this.drawShip(rivalPoint, m.rivalDirection, RED, m.rivalRecovery > 0);
     this.playerLabel.setPosition(playerPoint.x, playerPoint.y - 24);
