@@ -30,9 +30,24 @@ try {
   await page.evaluate(() => window.scene = window.testGame.scene.getScene('GameScene'));
   const state = () => page.evaluate(() => {
     const m = window.scene.model;
-    return { player: m.player, direction: m.direction, queued: m.queued, phase: m.phase, lives: m.lives, owned: m.owned.size, captures: m.captures, progress: m.progress, recovery: m.recovery, enemyClock: m.enemyClock, enemies: m.enemies };
+    return { player: m.player, direction: m.direction, queued: m.queued, phase: m.phase, lives: m.lives, owned: m.owned.size, captures: m.captures, progress: m.progress, recovery: m.recovery, enemyClock: m.enemyClock, enemies: m.enemies, rival: m.rival, rivalOwned: m.rivalOwned.size, rivalTrail: m.rivalTrail, rivalClock: m.rivalClock, rivalRecovery: m.rivalRecovery, rivalCaptures: m.rivalCaptures };
   });
   await mkdir('test-results', { recursive: true });
+  const sampleColors = async target => target.evaluate(async () => {
+    const colors = [];
+    for (const [x, y] of [[76, 268], [724, 268], [388, 316]]) {
+      const color = await new Promise(resolve => window.testGame.renderer.snapshotPixel(x, y, resolve));
+      colors.push({ r: color.r, g: color.g, b: color.b });
+    }
+    return colors;
+  });
+  const verifyColors = colors => {
+    const [blue, red, neutral] = colors;
+    assert(blue.b > blue.r * 1.3 && blue.g > blue.r, 'player land renders blue');
+    assert(red.r > red.b * 1.2, 'CPU land renders coral');
+    assert(neutral.r < 80 && neutral.g < 100 && neutral.b < 140, 'territory textures do not cover neutral land');
+  };
+  verifyColors(await sampleColors(page));
   await page.screenshot({ path: 'test-results/desktop-start.png' });
   await page.waitForTimeout(300); assert.equal((await state()).player.x, 4);
   await page.getByRole('button', { name: 'מתחילים לשחק' }).click();
@@ -65,7 +80,45 @@ try {
   assert.notEqual(await page.locator('#percent').innerText(), '2.9%');
   await page.evaluate(() => { window.scene.paused = false; window.scene.renderHud(); });
   await page.screenshot({ path: 'test-results/desktop-playing.png' });
-  await page.evaluate(() => window.scene.model.fail('בדיקת פסילה'));
+  // Let the actual AI plan, draw and close routes while the player circles safely in the base.
+  await page.evaluate(() => {
+    const s = window.scene; s.paused = true; const m = s.model; m.reset(); m.start();
+    for (let round = 0; round < 40 && m.rivalCaptures < 2 && m.phase === 'playing'; round++) {
+      for (const [direction, count] of [['right', 2], ['down', 2], ['left', 2], ['up', 2]]) {
+        m.turn(direction); for (let i = 0; i < count; i++) m.tick(10000 / 36 + .00001);
+      }
+    }
+    s.paused = false; s.renderHud();
+  });
+  await page.waitForTimeout(100);
+  const duel = await state(); assert(duel.rivalCaptures >= 2); assert(duel.rivalOwned > 70);
+  assert.equal(duel.lives, 3); assert.notEqual(await page.locator('#rival-percent').innerText(), '2.9%');
+  await page.screenshot({ path: 'test-results/desktop-duel.png' });
+  await page.evaluate(() => {
+    const s = window.scene; s.paused = true; const m = s.model; m.reset(); m.start();
+    for (let round = 0; round < 120 && m.phase === 'playing'; round++) for (const [direction, count] of [['right', 2], ['down', 2], ['left', 2], ['up', 2]]) {
+      m.turn(direction); for (let i = 0; i < count && m.phase === 'playing'; i++) m.tick(10000 / 36 + .00001);
+    }
+    s.paused = false; s.renderHud();
+  });
+  await page.waitForTimeout(100); assert.equal((await state()).phase, 'lost'); assert.equal((await state()).lives, 3);
+  assert.match(await page.locator('#overlay-title').innerText(), /המחשב הקדים/);
+  await page.screenshot({ path: 'test-results/desktop-cpu-win.png' });
+  await page.getByRole('button', { name: 'עוד סיבוב' }).click();
+  assert.equal((await state()).rivalOwned, 25); assert.equal((await state()).rivalCaptures, 0);
+  // Test the ability to cut the CPU's exposed trail in the running scene.
+  await page.evaluate(() => {
+    const m = window.scene.model; m.player = { x: 10, y: 12 }; m.previous = { ...m.player };
+    m.direction = m.queued = 'right'; m.trail = []; m.rivalTrail = [{ x: 11, y: 12 }]; m.step();
+  });
+  await page.waitForTimeout(100); assert((await state()).rivalRecovery > 0); assert.equal((await state()).lives, 3);
+  await page.getByRole('button', { name: 'משחק מחדש', exact: true }).click();
+  await page.getByRole('button', { name: 'מתחילים לשחק' }).click();
+  await page.evaluate(() => {
+    const m = window.scene.model; m.rival = { x: 10, y: 12 }; m.rivalDirection = 'right';
+    m.rivalPlan = [{ x: 11, y: 12 }, { x: 12, y: 12 }];
+    m.player = { x: 14, y: 12 }; m.trail = [{ x: 11, y: 12 }]; m.moveRival();
+  });
   await page.waitForTimeout(400); assert.equal((await state()).phase, 'recovering'); assert.equal((await state()).player.x, 4);
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
   const recovering = await state(); await page.waitForTimeout(400); assert.deepEqual(await state(), recovering);
@@ -73,9 +126,9 @@ try {
   await page.waitForTimeout(800); assert.equal((await state()).phase, 'playing');
   await page.evaluate(() => { const m = window.scene.model; m.fail('בדיקת פסילה'); m.tick(1000); m.fail('בדיקת פסילה'); });
   await page.waitForTimeout(100); assert.equal((await state()).phase, 'lost'); assert.equal((await state()).lives, 0);
-  assert.match(await page.locator('#overlay-title').innerText(), /היריבים ניצחו/);
+  assert.match(await page.locator('#overlay-title').innerText(), /נגמרו הלבבות/);
   await page.getByRole('button', { name: 'עוד סיבוב' }).click(); assert.equal((await state()).lives, 3);
-  await page.evaluate(() => { const m = window.scene.model; for (let i = 0; i < 565; i++) m.owned.add(i); m.trail = [{ x: 1, y: 23 }]; m.capture(); });
+  await page.evaluate(() => { const m = window.scene.model; for (let i = 0; m.owned.size < 565 && i < 864; i++) if (!m.rivalOwned.has(i) && !m.enemies.some(e => e.y * 36 + e.x === i)) m.owned.add(i); m.trail = [{ x: 1, y: 23 }]; m.capture(); });
   await page.waitForTimeout(100); assert.equal((await state()).phase, 'won'); assert.match(await page.locator('#overlay-title').innerText(), /המגרש שלכם/);
   await page.screenshot({ path: 'test-results/desktop-win.png' });
   await page.getByRole('button', { name: 'משחק מחדש', exact: true }).click();
@@ -122,8 +175,22 @@ try {
   assert.deepEqual(offlineErrors, []);
   await offline.screenshot({ path: 'test-results/offline-playing.png' });
   await offline.close();
+  const fallback = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const fallbackErrors = []; fallback.on('pageerror', error => fallbackErrors.push(error.message));
+  await fallback.route('**/src/main.ts*', async route => {
+    const response = await route.fetch();
+    const source = (await response.text()).replace('type: Phaser.AUTO', 'type: Phaser.CANVAS');
+    await route.fulfill({ response, body: `${source}\nwindow.testGame = game;` });
+  });
+  await fallback.goto(base); await fallback.bringToFront();
+  await fallback.waitForFunction(() => window.testGame?.scene.getScene('GameScene')?.model);
+  assert.equal(await fallback.evaluate(() => window.testGame.renderer.type), 1, 'Canvas fallback is actually selected');
+  verifyColors(await sampleColors(fallback));
+  await fallback.getByRole('button', { name: 'מתחילים לשחק' }).click(); await fallback.waitForTimeout(1000);
+  assert(await fallback.evaluate(() => window.testGame.scene.getScene('GameScene').model.player.x >= 7));
+  assert.deepEqual(fallbackErrors, []); await fallback.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, capture and HUD, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, WebGL/Canvas territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }
