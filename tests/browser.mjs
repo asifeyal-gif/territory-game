@@ -191,14 +191,25 @@ try {
   assert.equal(await page.evaluate(()=>window.scene.inactive),false,'visible-page blur does not pause an iPhone gesture');
   assert(await page.locator('#overlay').evaluate(node=>node.hidden));
   finger.y-=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
-  assert.equal((await state()).queued,'right','one held gesture can turn again');
+  assert.equal((await state()).queued,'down','holding after a swipe does not create accidental extra turns');
+  await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[finger]});
+  finger.y-=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  assert.equal((await state()).queued,'right','a new short swipe turns again');
   await page.waitForFunction(()=>window.scene.model.direction==='right');
+  await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[finger]});
   finger.y+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
   assert.equal((await state()).queued,'right','swipes cannot immediately reverse the player');
   await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
   await page.locator('canvas.arena-3d').evaluate((canvas,p)=>canvas.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerType:'touch',pointerId:window.swipePointer,isPrimary:true,clientX:p.x,clientY:p.y-30})),finger);
   assert.equal((await state()).queued,'right','cancelled gestures cannot turn later');
   assert.equal(await page.evaluate(()=>scrollY),0,'touch movement does not scroll the page');
+  assert(await page.evaluate(()=>getComputedStyle(document.getElementById('game')).position==='fixed'),'game viewport is anchored');
+  assert(await page.evaluate(()=>{
+    const e=new TouchEvent('touchmove',{bubbles:true,cancelable:true});document.querySelector('footer').dispatchEvent(e);return e.defaultPrevented;
+  }),'touch drags over HUD are prevented from panning Safari');
+
   await page.getByRole('button',{name:'משחק מחדש',exact:true}).click();
   await page.getByRole('button',{name:'מתחילים לשחק'}).click();
   await page.getByRole('button',{name:'הצג חצים'}).click();
@@ -294,7 +305,7 @@ try {
   await quality.screenshot({path:'test-results/desktop-quality.png'});
   assert.deepEqual(qualityErrors,[]);await quality.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, continuous touch swipes, visible-page blur regression, unobstructed manual pause, portrait camera, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, deliberate one-turn touch swipes, visible-page blur regression, unobstructed manual pause, portrait camera, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }

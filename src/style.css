@@ -115,7 +115,7 @@ body { background: radial-gradient(ellipse at 18% 0%, #233e52, transparent 55%),
 @media(max-height:600px) { .arena { max-height:none; } }
 .board-pause { position:absolute; top:8px; right:8px; z-index:3; min-width:58px; min-height:44px; border:1px solid #b9e4ef55; border-radius:12px; background:#122e40e8; color:#e3f6ff; padding:8px 10px; font-size:12px; box-shadow:0 3px 12px #0005; }
 .board-pause[aria-pressed="true"] { background:#397086; }
-#game { height:100dvh; }
+#game { position:fixed; inset:0; width:100%; height:100svh; overflow:hidden; overscroll-behavior:none; }
 @media(max-width:600px) {
  .shell { padding:8px; gap:8px; justify-content:flex-start; }
  .topbar { min-height:32px; } .brand { gap:8px; } .brand-icon { width:30px; height:30px; font-size:25px; border-radius:10px; }
@@ -129,3 +129,10 @@ body { background: radial-gradient(ellipse at 18% 0%, #233e52, transparent 55%),
  .secondary { padding:8px; font-size:10px; } .board-pause { top:5px; right:5px; }
  .missionbar { font-size:10px; } .shield-button { min-height:32px; }
 }
+
+html, body { position:fixed; inset:0; width:100%; overflow:hidden; overscroll-behavior:none; }
+.shell { overscroll-behavior:none; }
+.overlay-card { touch-action:pan-y; overscroll-behavior:contain; }
+
+/* The canvas consumes game gestures; instruction cards retain native scrolling. */
+#board { touch-action:pan-y; }

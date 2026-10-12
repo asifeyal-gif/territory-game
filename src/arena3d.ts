@@ -56,7 +56,7 @@ export class Arena3D {
     this.renderer = new T.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: false });
     this.renderer.domElement.className = 'arena-3d';
     this.renderer.domElement.setAttribute('aria-label', 'זירת איים תלת־ממדית');
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, matchMedia('(pointer:coarse)').matches || innerWidth<=600 ? 1.25 : 1.75));
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap; this.renderer.shadowMap.autoUpdate = false;
     const glInfo=this.renderer.getContext();
     const debug=glInfo.getExtension('WEBGL_debug_renderer_info');

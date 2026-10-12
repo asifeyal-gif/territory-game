@@ -15,9 +15,9 @@ root.innerHTML = `
   </section>
   <section class="missionbar" aria-label="התקדמות בשלבים"><div><strong id="level">שלב 1</strong><span id="pressure">פתיחה</span></div><div class="scoreboard"><span>ניקוד <strong id="score">0</strong></span><span id="combo">רצף ×1</span></div><button id="shield" class="shield-button" disabled>מגן · E <strong id="charges">1</strong></button></section>
   <section class="arena"><div class="arena-top"><div class="legend"><span><i class="dot"></i> השטח שלכם</span><span class="enemy-legend"><i class="dot"></i> המחשב כובש באדום</span><span class="hazard-legend"><i class="dot"></i> מוקשי אנרגיה</span></div><span class="arena-label">LIVE ARENA <i></i></span></div>
-    <div id="board" aria-label="מגרש המשחק"><button id="pause" class="board-pause" disabled aria-pressed="false">השהיה</button><div id="overlay" class="overlay"><div class="overlay-card"><div class="duel-emblem"><span>◈</span><i>×</i><span>◈</span></div><span id="eyebrow">השטח הבא שלכם</span><h2 id="overlay-title">כובשים. חותכים. מנצחים.</h2><p id="overlay-description"></p><button id="start" class="primary">מתחילים לשחק ←</button><p class="overlay-note">החליקו על המגרש לשינוי כיוון · במחשב: חצים / WASD</p></div></div></div>
+    <div id="board" aria-label="מגרש המשחק"><button id="pause" class="board-pause" disabled aria-pressed="false">השהיה</button><div id="overlay" class="overlay"><div class="overlay-card"><div class="duel-emblem"><span>◈</span><i>×</i><span>◈</span></div><span id="eyebrow">השטח הבא שלכם</span><h2 id="overlay-title">כובשים. חותכים. מנצחים.</h2><p id="overlay-description"></p><button id="start" class="primary">מתחילים לשחק ←</button><p class="overlay-note">בטלפון: החליקו קצר והרימו אצבע · במחשב: חצים / WASD</p></div></div></div>
   </section>
-  <footer><div><p id="status" role="status" aria-live="polite">מוכנים לתחרות?</p><p class="hint">החליקו על המגרש כדי לפנות · אפשר לשנות כיוון בלי להרים את האצבע · מגן מציל שובל בסכנה</p></div><div class="actions"><button id="control-mode" class="secondary" aria-pressed="false" aria-controls="direction-controls">הצג חצים</button><button id="restart" class="secondary">משחק מחדש</button></div></footer>
+  <footer><div><p id="status" role="status" aria-live="polite">מוכנים לתחרות?</p><p class="hint">החליקו על המגרש כדי לפנות · כל החלקה = פנייה אחת; לפנייה הבאה מרימים ומחליקים שוב · מגן מציל שובל בסכנה</p></div><div class="actions"><button id="control-mode" class="secondary" aria-pressed="false" aria-controls="direction-controls">הצג חצים</button><button id="restart" class="secondary">משחק מחדש</button></div></footer>
   <nav id="direction-controls" class="touch-controls" aria-label="כיווני תנועה"><button data-direction="left" aria-label="שמאלה">←</button><div><button data-direction="up" aria-label="למעלה">↑</button><button data-direction="down" aria-label="למטה">↓</button></div><button data-direction="right" aria-label="ימינה">→</button></nav>
 </main>`;
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -76,6 +76,11 @@ class GameScene extends Phaser.Scene {
     });
     const board = element<HTMLDivElement>('board');
     const stopSwipes = bindSwipe(board, direction => this.turn(direction), () => !this.paused && !this.inactive && this.model.phase === 'playing');
+    const preventPagePan=(event:TouchEvent)=> {
+      if(event.target instanceof Element&&!event.target.closest('.overlay-card')&&event.cancelable)event.preventDefault();
+    };
+    root.addEventListener('touchmove',preventPagePan,{passive:false});
+    this.events.once('shutdown',()=>root.removeEventListener('touchmove',preventPagePan));
     this.cancelSwipe=stopSwipes.cancel;
     this.events.once('shutdown', stopSwipes.dispose);
     const controlsButton = element<HTMLButtonElement>('control-mode');
@@ -154,7 +159,7 @@ class GameScene extends Phaser.Scene {
     document.querySelector('.duel-emblem')!.innerHTML=finished&&m.phase==='won'?'<span class="trophy-emblem">🏆</span>':'<span>◈</span><i>×</i><span>◈</span>';
     element('eyebrow').textContent = finished ? m.phase === 'won' ? `🏆 גביע ${m.trophies} — שלב ${m.level+1} נפתח` : 'כל מסלול מלמד משהו' : 'כובשים בדרך שלכם';
     element('overlay-title').textContent = finished ? m.phase === 'won' ? `ניצחתם את שלב ${m.level}!` : m.rivalPercent >= m.target ? 'המחשב הקדים אתכם.' : 'נגמרו הלבבות.' : 'כובשים. חותכים. מנצחים.';
-    element('overlay-description').textContent = finished ? `אתם: ${m.percent.toFixed(1)}% · המחשב: ${m.rivalPercent.toFixed(1)}%. ${m.phase === 'won' ? 'המגרש שלכם!' : m.message} מוכנים לסיבוב נוסף?` : this.paused ? 'לחצו על ממשיכים או על מקש רווח כדי לחזור למשחק.' : this.inactive ? 'המשחק נעצר אוטומטית. חזרו ללשונית כדי להמשיך.' : `שלב ${m.level}: הגיעו ל־${m.target}% לפני המחשב. החליקו על המגרש לשינוי כיוון. מסלול ארוך מושך התקפה! כפתור המגן נותן 3 שניות הגנה. כל ניצחון מעניק גביע ופותח שלב קשה יותר.`;
+    element('overlay-description').textContent = finished ? `אתם: ${m.percent.toFixed(1)}% · המחשב: ${m.rivalPercent.toFixed(1)}%. ${m.phase === 'won' ? 'המגרש שלכם!' : m.message} מוכנים לסיבוב נוסף?` : this.paused ? 'לחצו על ממשיכים או על מקש רווח כדי לחזור למשחק.' : this.inactive ? 'המשחק נעצר אוטומטית. חזרו ללשונית כדי להמשיך.' : `שלב ${m.level}: הגיעו ל־${m.target}% לפני המחשב. לכל פנייה: החליקו קצר והרימו את האצבע. מסלול ארוך מושך התקפה! כפתור המגן נותן 3 שניות הגנה. כל ניצחון מעניק גביע ופותח שלב קשה יותר.`;
     startButton.textContent = finished ? m.phase==='won'?`לשלב ${m.level+1} ←`:`עוד סיבוב — שלב ${m.level} ←` : this.paused ? 'ממשיכים ←' : 'מתחילים לשחק ←';
     element('status').textContent = m.phase === 'recovering' ? `${m.message} חוזרים לבסיס בעוד שנייה.` : m.phase === 'ready' ? 'מוכנים לתחרות על המגרש?' : this.paused ? 'המשחק מושהה. לחצו על המשך בצד המגרש.' : this.inactive ? 'המשחק מושהה כשהלשונית אינה פעילה.' : m.message;
   }
