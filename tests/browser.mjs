@@ -176,9 +176,32 @@ try {
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(150);
   await page.screenshot({ path: 'test-results/mobile-start.png' });
   await page.getByRole('button', { name: 'מתחילים לשחק' }).click();
+  assert.equal(await page.locator('#direction-controls').isVisible(),false,'swipe mode has no arrow pad by default');
+  const touch=await page.context().newCDPSession(page);
+  await touch.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:2});
+  const boardBox=await page.locator('canvas.arena-3d').boundingBox();
+  const finger={x:Math.round(boardBox.x+boardBox.width*.5),y:Math.round(boardBox.y+boardBox.height*.5),id:0};
+  await page.evaluate(()=>document.querySelector('canvas.arena-3d').addEventListener('pointerdown',e=>window.swipePointer=e.pointerId,{once:true}));
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[finger]});
+  finger.y+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  assert.equal((await state()).queued,'down','swipe acts before lifting the finger');
+  await page.waitForFunction(()=>window.scene.model.direction==='down');
+  finger.x+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  assert.equal((await state()).queued,'right','one held gesture can turn again');
+  await page.waitForFunction(()=>window.scene.model.direction==='right');
+  finger.x-=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  assert.equal((await state()).queued,'right','swipes cannot immediately reverse the player');
+  await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+  await page.locator('canvas.arena-3d').evaluate((canvas,p)=>canvas.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerType:'touch',pointerId:window.swipePointer,isPrimary:true,clientX:p.x,clientY:p.y-30})),finger);
+  assert.equal((await state()).queued,'right','cancelled gestures cannot turn later');
+  assert.equal(await page.evaluate(()=>scrollY),0,'touch movement does not scroll the page');
+  await page.getByRole('button',{name:'משחק מחדש',exact:true}).click();
+  await page.getByRole('button',{name:'מתחילים לשחק'}).click();
+  await page.getByRole('button',{name:'הצג חצים'}).click();
+  assert(await page.locator('#direction-controls').isVisible());
   await page.getByRole('button', { name: 'למטה', exact: true }).dispatchEvent('pointerdown'); await page.waitForTimeout(400);
   assert.equal((await state()).direction, 'down');
-  for (const size of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+  for (const size of [{ width: 390, height: 844 }, { width: 390, height: 667 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(size); await page.waitForTimeout(150);
     assert(await page.evaluate(() => {
       const canvas = document.querySelector('canvas.arena-3d').getBoundingClientRect();
@@ -187,6 +210,8 @@ try {
     }), `full board and footer visible at ${size.width}x${size.height}`);
   }
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(150);
+  await page.getByRole('button',{name:'הסתר חצים'}).click();
+  assert.equal(await page.locator('#direction-controls').isVisible(),false);
   await page.screenshot({ path: 'test-results/mobile-playing.png' });
   let offline = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const offlineRequests = [], offlineErrors = [];
@@ -259,7 +284,7 @@ try {
   await quality.screenshot({path:'test-results/desktop-quality.png'});
   assert.deepEqual(qualityErrors,[]);await quality.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, touch controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, continuous touch swipes, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }
