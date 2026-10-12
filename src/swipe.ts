@@ -36,12 +36,11 @@ export function bindSwipe(
   board.addEventListener('pointerup', end);
   board.addEventListener('pointercancel', end);
   board.addEventListener('lostpointercapture', end);
-  window.addEventListener('blur', reset);
   document.addEventListener('visibilitychange', visibility);
   return {cancel:reset,dispose: () => {
     end(); board.removeEventListener('pointerdown', down); board.removeEventListener('pointermove', move);
     board.removeEventListener('pointerup', end); board.removeEventListener('pointercancel', end);
-    board.removeEventListener('lostpointercapture', end); window.removeEventListener('blur', reset);
+    board.removeEventListener('lostpointercapture', end);
     document.removeEventListener('visibilitychange', visibility);
   }};
 }

@@ -113,3 +113,19 @@ body { background: radial-gradient(ellipse at 18% 0%, #233e52, transparent 55%),
 #control-mode { display:none; }
 @media(pointer:coarse),(max-width:600px) { #control-mode { display:inline-block; } .actions { gap:5px; } .secondary { padding:9px 11px; } }
 @media(max-height:600px) { .arena { max-height:none; } }
+.board-pause { position:absolute; top:8px; right:8px; z-index:3; min-width:58px; min-height:44px; border:1px solid #b9e4ef55; border-radius:12px; background:#122e40e8; color:#e3f6ff; padding:8px 10px; font-size:12px; box-shadow:0 3px 12px #0005; }
+.board-pause[aria-pressed="true"] { background:#397086; }
+#game { height:100dvh; }
+@media(max-width:600px) {
+ .shell { padding:8px; gap:8px; justify-content:flex-start; }
+ .topbar { min-height:32px; } .brand { gap:8px; } .brand-icon { width:30px; height:30px; font-size:25px; border-radius:10px; }
+ h1 { font-size:20px; } h1 span { font-size:8px; margin-right:5px; letter-spacing:1px; } .brand p { display:none; }
+ .icon-button { height:32px; width:32px; border-radius:10px; font-size:19px; }
+ .territory-stat { padding:7px 9px; } .stat { padding:7px 2px; } .progress { margin:5px 0 4px; }
+ .stat-line strong { font-size:18px; } .stat > span { font-size:10px; } .lives { margin-top:5px; }
+ .arena { padding:4px; border-radius:14px; } .arena-top { padding:2px 3px 5px; }
+ footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; }
+ .hint { display:none; } #status { font-size:10px; line-height:1.4; margin:0; max-height:2.8em; overflow:hidden; }
+ .secondary { padding:8px; font-size:10px; } .board-pause { top:5px; right:5px; }
+ .missionbar { font-size:10px; } .shield-button { min-height:32px; }
+}

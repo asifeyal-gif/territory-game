@@ -85,11 +85,12 @@ try {
   assert.equal(await page.evaluate(() => scrollY), 0);
   await page.keyboard.press('KeyE');assert((await state()).shieldRemaining>0);assert.equal((await state()).shieldCharges,0);assert.match(await page.locator('#charges').innerText(),/פעיל/);
   await page.getByRole('button', { name: 'השהיה', exact: true }).click();
+  assert(await page.locator('#overlay').evaluate(node=>node.hidden),'manual pause keeps the field visible');
   const paused = await state(); await page.waitForTimeout(400); assert.deepEqual(await state(), paused);
   await page.getByRole('button', { name: 'המשך', exact: true }).click();
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
   const hidden = await state(); await page.waitForTimeout(400); assert.deepEqual(await state(), hidden);
-  assert.match(await page.locator('#overlay-description').innerText(), /אוטומטית/);
+  assert(await page.locator('#overlay').evaluate(node=>node.hidden),'hidden tab freezes without an intrusive modal');
   await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
   await page.getByRole('button', { name: 'משחק מחדש', exact: true }).click();
   assert.equal((await state()).phase, 'ready'); assert.equal((await state()).owned, 25);
@@ -183,13 +184,16 @@ try {
   const finger={x:Math.round(boardBox.x+boardBox.width*.5),y:Math.round(boardBox.y+boardBox.height*.5),id:0};
   await page.evaluate(()=>document.querySelector('canvas.arena-3d').addEventListener('pointerdown',e=>window.swipePointer=e.pointerId,{once:true}));
   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[finger]});
-  finger.y+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  finger.x+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
   assert.equal((await state()).queued,'down','swipe acts before lifting the finger');
   await page.waitForFunction(()=>window.scene.model.direction==='down');
-  finger.x+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+  assert.equal(await page.evaluate(()=>window.scene.inactive),false,'visible-page blur does not pause an iPhone gesture');
+  assert(await page.locator('#overlay').evaluate(node=>node.hidden));
+  finger.y-=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
   assert.equal((await state()).queued,'right','one held gesture can turn again');
   await page.waitForFunction(()=>window.scene.model.direction==='right');
-  finger.x-=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
+  finger.y+=24;await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finger]});
   assert.equal((await state()).queued,'right','swipes cannot immediately reverse the player');
   await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
   await page.locator('canvas.arena-3d').evaluate((canvas,p)=>canvas.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerType:'touch',pointerId:window.swipePointer,isPrimary:true,clientX:p.x,clientY:p.y-30})),finger);
@@ -199,7 +203,7 @@ try {
   await page.getByRole('button',{name:'מתחילים לשחק'}).click();
   await page.getByRole('button',{name:'הצג חצים'}).click();
   assert(await page.locator('#direction-controls').isVisible());
-  await page.getByRole('button', { name: 'למטה', exact: true }).dispatchEvent('pointerdown'); await page.waitForTimeout(400);
+  await page.getByRole('button', { name: 'ימינה', exact: true }).dispatchEvent('pointerdown'); await page.waitForTimeout(400);
   assert.equal((await state()).direction, 'down');
   for (const size of [{ width: 390, height: 844 }, { width: 390, height: 667 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(size); await page.waitForTimeout(150);
@@ -208,6 +212,12 @@ try {
       const controls = document.querySelector('footer').getBoundingClientRect();
       return canvas.top >= 0 && canvas.bottom <= innerHeight && canvas.left >= 0 && canvas.right <= innerWidth && controls.bottom <= innerHeight;
     }), `full board and footer visible at ${size.width}x${size.height}`);
+    assert(await page.evaluate(()=>{
+      const a=window.scene.arena3d;
+      const points=[[-18.4,-12.4],[-18.4,12.4],[18.4,-12.4],[18.4,12.4]].map(([x,z])=>a.ships[0].position.clone().set(x,0,z).project(a.camera));
+      return points.every(p=>Math.abs(p.x)<1&&Math.abs(p.y)<1);
+    }),'rotated phone camera still shows all four corners');
+
   }
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(150);
   await page.getByRole('button',{name:'הסתר חצים'}).click();
@@ -234,8 +244,8 @@ try {
   assert(await offline.locator('#overlay').evaluate(node => node.hidden));
   assert.equal(await offline.locator('#pause').isEnabled(), true);
   await offline.getByRole('button', { name: 'השהיה', exact: true }).click();
-  assert(await offline.getByRole('button', { name: 'ממשיכים' }).isVisible());
-  await offline.getByRole('button', { name: 'ממשיכים' }).click();
+  assert(await offline.locator('#overlay').evaluate(node=>node.hidden));
+  await offline.getByRole('button', { name: 'המשך',exact:true }).click();
   assert(await offline.locator('#overlay').evaluate(node => node.hidden));
   assert.deepEqual(offlineRequests, [], 'offline export never requests the network');
   assert.deepEqual(offlineErrors, []);
@@ -284,7 +294,7 @@ try {
   await quality.screenshot({path:'test-results/desktop-quality.png'});
   assert.deepEqual(qualityErrors,[]);await quality.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, continuous touch swipes, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, continuous touch swipes, visible-page blur regression, unobstructed manual pause, portrait camera, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }

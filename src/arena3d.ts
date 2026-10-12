@@ -11,6 +11,7 @@ export class Arena3D {
   readonly ready: Promise<void>;
   private scene = new T.Scene();
   private camera = new T.OrthographicCamera();
+  portrait = false;
   private environment: T.WebGLRenderTarget;
   private territoryPixels = new Uint8Array(COLS * ROWS * 4);
   private territoryTexture = new T.DataTexture(this.territoryPixels, COLS, ROWS);
@@ -218,7 +219,11 @@ export class Arena3D {
   }
   private resize(board:HTMLElement) {
     const w=Math.max(1,board.clientWidth),h=Math.max(1,board.clientHeight),aspect=w/h;
-    const halfHeight=Math.max(12,20.3/aspect);
+    this.portrait=window.innerWidth<=600 && window.innerHeight>window.innerWidth;
+    this.camera.up.set(this.portrait?1:0,this.portrait?0:1,0);
+    this.camera.position.set(0,this.portrait?40:30,this.portrait?12:29);
+    this.camera.lookAt(0,0,0);
+    const halfHeight=this.portrait?Math.max(19.5,12.7/aspect):Math.max(12,20.3/aspect);
     this.camera.left=-halfHeight*aspect;this.camera.right=halfHeight*aspect;this.camera.top=halfHeight;this.camera.bottom=-halfHeight;this.camera.updateProjectionMatrix();this.renderer.setSize(w,h,false);this.needsRender=true;
   }
   private position(previous:Point,current:Point,f:number) {return {x:previous.x+(current.x-previous.x)*f-COLS/2+.5,z:previous.y+(current.y-previous.y)*f-ROWS/2+.5};}
