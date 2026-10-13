@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && vite build && node scripts/portable.mjs",
+    "build": "npm run typecheck && vite build && node scripts/portable.mjs && node scripts/portal.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.ts",
     "test:browser": "node tests/browser.mjs"
