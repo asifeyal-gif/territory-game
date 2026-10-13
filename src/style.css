@@ -136,3 +136,16 @@ html, body { position:fixed; inset:0; width:100%; overflow:hidden; overscroll-be
 
 /* The canvas consumes game gestures; instruction cards retain native scrolling. */
 #board { touch-action:pan-y; }
+#records { border:0; background:none; padding:4px; }
+.daily-teaser { font-size:11px; color:#c9dba4; padding:10px 0 0; line-height:1.5; }
+.records-dialog { color:#edf7ff; width:min(460px,calc(100% - 24px)); max-height:85svh; margin:auto; }
+.records-dialog::backdrop { background:#05121bc9; }
+.records-dialog #close-records { float:left; }
+.record-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:18px 0; }
+.record-grid div { padding:15px; border:1px solid #ffffff15; border-radius:12px; background:#ffffff05; }
+.record-grid strong,.record-grid span { display:block; } .record-grid strong { font-size:25px; color:#aae9ff; }
+.record-grid span,.record-note { font-size:11px; color:#a8bdce; margin-top:7px; }
+.records-dialog h3 { margin-bottom:8px; } #daily-title,#daily-progress { font-size:13px; line-height:1.5; }
+@media(max-width:600px){.actions{gap:3px}.actions .secondary{padding:8px 6px;font-size:9px}.daily-teaser{font-size:10px}.records-dialog{padding:18px}}
+.quick-guide { display:grid; gap:5px; text-align:right; padding:10px 13px; margin:0 0 15px; border-radius:10px; background:#ffffff06; color:#c7e5ee; font-size:12px; }
+button.daily-teaser { border:0; background:none; display:block; width:100%; }

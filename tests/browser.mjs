@@ -234,6 +234,28 @@ try {
   await page.getByRole('button',{name:'הסתר חצים'}).click();
   assert.equal(await page.locator('#direction-controls').isVisible(),false);
   await page.screenshot({ path: 'test-results/mobile-playing.png' });
+  await page.getByRole('button',{name:'שיאים וגביעים'}).click();
+  assert(await page.locator('#records-dialog').isVisible());
+  const recordsPaused=await state();await page.waitForTimeout(250);assert.deepEqual(await state(),recordsPaused,'record panel pauses the round');
+  await page.evaluate(()=>{const s=window.scene;s.profile.observe(s.model.score,s.model.level,100);s.renderRecords();});
+  const trophiesBefore=(await state()).trophies;
+  await page.getByRole('button',{name:'קבלו גביע יומי'}).click();
+  assert.equal((await state()).trophies,trophiesBefore+1);assert(await page.getByRole('button',{name:'הגביע היומי כבר נאסף'}).isDisabled());
+  await page.getByRole('button',{name:'סגור',exact:true}).click();
+  await page.waitForFunction(()=>!window.scene.paused);
+  assert.equal(await page.evaluate(()=>window.scene.paused),false,'closing records restores play');
+  await page.evaluate(()=>Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.sharedResult=data;}}));
+  await page.getByRole('button',{name:'שתף',exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.sharedResult.url),'https://asifeyal-gif.github.io/territory-game/play.html');
+  await page.evaluate(()=>{
+    Object.defineProperty(navigator,'share',{configurable:true,value:undefined});
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copiedResult=text;}}});
+  });
+  await page.getByRole('button',{name:'שתף',exact:true}).click();
+  assert.match(await page.evaluate(()=>window.copiedResult),/https:\/\/asifeyal-gif.github.io\/territory-game\/play.html/);
+  assert(await page.getByRole('button',{name:'הועתק ✓',exact:true}).isVisible());
+
+  assert.equal(await page.evaluate(()=>window.scene.paused),false);
   let offline = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const offlineRequests = [], offlineErrors = [];
   offline.on('request', request => { if (/^https?:/.test(request.url())) offlineRequests.push(request.url()); });
@@ -305,7 +327,7 @@ try {
   await quality.screenshot({path:'test-results/desktop-quality.png'});
   assert.deepEqual(qualityErrors,[]);await quality.close();
   assert.deepEqual(errors, []);
-  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, deliberate one-turn touch swipes, visible-page blur regression, unobstructed manual pause, portrait camera, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload; no JS errors.');
+  console.log('PASS browser: start, automatic movement, turns/reversal, blue/CPU capture and HUD, CPU victory, bidirectional trail cutting, 3D island/ocean colors, 2D fallback territory colors, pause, hidden-tab pause including recovery, life loss, game over, win/replay, restart, deliberate one-turn touch swipes, visible-page blur regression, unobstructed manual pause, portrait camera, cancellation, no reversal/scroll, optional arrow controls, desktop/mobile/landscape layout; standalone HTML launches without network requests; full lighting tier, compact terrain instances, shields, level progression, trophy rewards/reload, local records, one-time daily rewards, native share payload; no JS errors.');
 } finally {
   await browser?.close(); server.kill('SIGTERM');
 }

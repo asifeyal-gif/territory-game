@@ -60,6 +60,7 @@ export class TerritoryGame {
   campaignScore = 0;
   trophies = 0;
   score = 0;
+  playerCuts = 0;
   combo = 0;
   shieldCharges = 1;
   shieldRemaining = 0;
@@ -85,7 +86,7 @@ export class TerritoryGame {
     this.shieldCharges--;this.shieldRemaining=3000;
     this.message='מגן פעיל: השובל מוגן מחיתוך למשך 3 שניות. גבולות ושובל עצמי עדיין מסוכנים.';this.revision++;return true;
   }
-  private rewardCut(): void { this.score+=200*(this.difficulty==='extreme'?2:1);this.shieldCharges=Math.min(2,this.shieldCharges+1);this.stunRival(); }
+  private rewardCut(): void { this.playerCuts++;this.score+=200*(this.difficulty==='extreme'?2:1);this.shieldCharges=Math.min(2,this.shieldCharges+1);this.stunRival(); }
 
   get percent(): number { return this.owned.size / (COLS * ROWS) * 100; }
   get rivalPercent(): number { return this.rivalOwned.size / (COLS * ROWS) * 100; }
@@ -103,7 +104,7 @@ export class TerritoryGame {
     }
     this.enemyPrevious = this.enemies.map(e => ({ x: e.x, y: e.y }));
     this.direction = this.queued = 'right';
-    this.score=this.campaignScore;this.combo=0;this.shieldCharges=1;this.shieldRemaining=0;
+    this.score=this.campaignScore;this.combo=0;this.playerCuts=0;this.shieldCharges=1;this.shieldRemaining=0;
     this.rivalMode='capture';this.rivalWarning=this.huntCooldown=this.huntSteps=0;
     this.reinforcement=undefined;this.reinforcementDelay=0;
     this.phase = 'ready'; this.lives = 3; this.captures = this.rivalCaptures = this.rivalFailures = 0;

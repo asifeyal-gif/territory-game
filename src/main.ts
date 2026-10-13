@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { PlayerProfile, dailyChallenge, dayKey, publicGameUrl } from './profile';
 import { bindSwipe } from './swipe';
 import { Arena3D } from './arena3d';
 import { TerritoryGame, COLS, ROWS, TARGET, STEP_MS, RIVAL_STEP_MS, index, vectors, type Direction, type Point } from './engine';
@@ -7,7 +8,7 @@ import './style.css';
 const root = document.querySelector<HTMLDivElement>('#game')!;
 root.innerHTML = `
 <main class="shell" dir="rtl">
-  <header class="topbar"><div class="brand"><span class="brand-icon">◈</span><div><h1>טריטוריה<span> DUEL</span></h1><p>שני כובשים. מגרש אחד.</p></div></div><div class="header-actions"><span class="best-badge">🏆 <strong id="trophies">0</strong> גביעים · שיא <strong id="best">0%</strong></span><button id="sound" class="icon-button" aria-label="הפעל צלילים" aria-pressed="false">♪</button></div></header>
+  <header class="topbar"><div class="brand"><span class="brand-icon">◈</span><div><h1>טריטוריה<span> DUEL</span></h1><p>שני כובשים. מגרש אחד.</p></div></div><div class="header-actions"><button id="records" class="best-badge" aria-label="שיאים וגביעים">🏆 <strong id="trophies">0</strong> גביעים · שיא <strong id="best">0%</strong></button><button id="sound" class="icon-button" aria-label="הפעל צלילים" aria-pressed="false">♪</button></div></header>
   <section class="dashboard" aria-label="מצב המשחק">
     <div class="territory-stat player-stat"><div class="stat-line"><span><i class="team-icon"></i> אתם</span><strong id="percent">0%</strong></div><div class="progress"><div id="progress"></div></div><small id="target-note">הראשון שכובש ${TARGET}% מנצח</small></div>
     <div class="territory-stat rival-stat"><div class="stat-line"><span><i class="team-icon"></i> המחשב</span><strong id="rival-percent">0%</strong></div><div class="progress"><div id="rival-progress"></div></div><small id="rival-status">מוכן לצאת מהבסיס</small></div>
@@ -15,10 +16,11 @@ root.innerHTML = `
   </section>
   <section class="missionbar" aria-label="התקדמות בשלבים"><div><strong id="level">שלב 1</strong><span id="pressure">פתיחה</span></div><div class="scoreboard"><span>ניקוד <strong id="score">0</strong></span><span id="combo">רצף ×1</span></div><button id="shield" class="shield-button" disabled>מגן · E <strong id="charges">1</strong></button></section>
   <section class="arena"><div class="arena-top"><div class="legend"><span><i class="dot"></i> השטח שלכם</span><span class="enemy-legend"><i class="dot"></i> המחשב כובש באדום</span><span class="hazard-legend"><i class="dot"></i> מוקשי אנרגיה</span></div><span class="arena-label">LIVE ARENA <i></i></span></div>
-    <div id="board" aria-label="מגרש המשחק"><button id="pause" class="board-pause" disabled aria-pressed="false">השהיה</button><div id="overlay" class="overlay"><div class="overlay-card"><div class="duel-emblem"><span>◈</span><i>×</i><span>◈</span></div><span id="eyebrow">השטח הבא שלכם</span><h2 id="overlay-title">כובשים. חותכים. מנצחים.</h2><p id="overlay-description"></p><button id="start" class="primary">מתחילים לשחק ←</button><p class="overlay-note">בטלפון: החליקו קצר והרימו אצבע · במחשב: חצים / WASD</p></div></div></div>
+    <div id="board" aria-label="מגרש המשחק"><button id="pause" class="board-pause" disabled aria-pressed="false">השהיה</button><div id="overlay" class="overlay"><div class="overlay-card"><div class="duel-emblem"><span>◈</span><i>×</i><span>◈</span></div><span id="eyebrow">השטח הבא שלכם</span><h2 id="overlay-title">כובשים. חותכים. מנצחים.</h2><p id="overlay-description"></p><div id="quick-guide" class="quick-guide"><span>① החליקו קצר והרימו אצבע</span><span>② צאו מהשטח הכחול</span><span>③ חזרו לכחול כדי לכבוש</span></div><button id="start" class="primary">מתחילים לשחק ←</button><button id="daily-teaser" class="daily-teaser" aria-label="אתגר יומי"></button><p class="overlay-note">בטלפון: החליקו קצר והרימו אצבע · במחשב: חצים / WASD</p></div></div></div>
   </section>
-  <footer><div><p id="status" role="status" aria-live="polite">מוכנים לתחרות?</p><p class="hint">החליקו על המגרש כדי לפנות · כל החלקה = פנייה אחת; לפנייה הבאה מרימים ומחליקים שוב · מגן מציל שובל בסכנה</p></div><div class="actions"><button id="control-mode" class="secondary" aria-pressed="false" aria-controls="direction-controls">הצג חצים</button><button id="restart" class="secondary">משחק מחדש</button></div></footer>
+  <footer><div><p id="status" role="status" aria-live="polite">מוכנים לתחרות?</p><p class="hint">החליקו על המגרש כדי לפנות · כל החלקה = פנייה אחת; לפנייה הבאה מרימים ומחליקים שוב · מגן מציל שובל בסכנה</p></div><div class="actions"><button id="share" class="secondary">שתף</button><button id="control-mode" class="secondary" aria-pressed="false" aria-controls="direction-controls">הצג חצים</button><button id="restart" class="secondary">משחק מחדש</button></div></footer>
   <nav id="direction-controls" class="touch-controls" aria-label="כיווני תנועה"><button data-direction="left" aria-label="שמאלה">←</button><div><button data-direction="up" aria-label="למעלה">↑</button><button data-direction="down" aria-label="למטה">↓</button></div><button data-direction="right" aria-label="ימינה">→</button></nav>
+<dialog id="records-dialog" class="records-dialog overlay-card" dir="rtl"><button id="close-records" class="secondary">סגור</button><h2>השיאים שלכם 🏆</h2><div id="records-content"></div><h3>האתגר היומי</h3><p id="daily-title"></p><p id="daily-progress"></p><button id="claim-daily" class="primary">קבלו גביע יומי</button><p class="record-note">השיאים נשמרים בדפדפן הזה. אין כאן דירוג עולמי.</p></dialog>
 </main>`;
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const startButton = element<HTMLButtonElement>('start');
@@ -49,11 +51,24 @@ class GameScene extends Phaser.Scene {
   private inactive = document.hidden;
   private best = 0;
   private savedTrophies = 0;
+  private profile = new PlayerProfile();
+  private recordedWin = false;
+  private panelWasPaused = false;
   private audioEnabled = false;
   private audio?: AudioContext;
   constructor() { super('GameScene'); }
   create(): void {
     try { this.best = Number(localStorage.getItem('territory-best')) || 0;const bank=Number(localStorage.getItem('territory-trophies'));this.model.trophies=Number.isFinite(bank)?Math.max(0,Math.floor(bank)):0;this.savedTrophies=this.model.trophies; } catch { /* Storage can be unavailable. */ }
+    let storage:Storage|undefined;try{storage=localStorage;}catch{/* Private browsing may block storage. */}
+    this.profile=new PlayerProfile(storage,this.model.trophies);
+    element<HTMLButtonElement>('records').onclick=()=>this.openRecords();
+    element<HTMLButtonElement>('daily-teaser').onclick=()=>this.openRecords();
+    element<HTMLButtonElement>('close-records').onclick=()=>element<HTMLDialogElement>('records-dialog').close();
+    element<HTMLDialogElement>('records-dialog').addEventListener('close',()=>{this.paused=this.panelWasPaused;this.renderHud();});
+    element<HTMLButtonElement>('claim-daily').onclick=()=>{
+      if(this.profile.claim()){this.model.trophies++;this.beep(880);this.renderHud();this.renderRecords();}
+    };
+    element<HTMLButtonElement>('share').onclick=()=>void this.share();
     this.createOcean();
     this.terrain = this.add.graphics(); this.actors = this.add.graphics();
     this.playerLabel = this.add.text(0, 0, 'YOU', { fontFamily: 'Arial', fontSize: '9px', fontStyle: 'bold', color: '#a5f1ff' }).setOrigin(.5).setDepth(5);
@@ -110,8 +125,31 @@ class GameScene extends Phaser.Scene {
   }
   private start(): void {
     if(this.model.phase==='ready'&&startButton.disabled)return;
+    const beginAttempt=['ready','won','lost'].includes(this.model.phase);
     if(this.model.phase==='won'){this.model.nextLevel();this.clearBursts();}else if(this.model.phase==='lost'){this.model.reset();this.clearBursts();}
+    if(beginAttempt)this.profile.start();
     this.paused = false; this.model.start(); this.beep(520); this.renderHud();
+  }
+  private openRecords():void {
+    this.panelWasPaused=this.paused;this.paused=true;this.cancelSwipe?.();this.renderHud();this.renderRecords();
+    element<HTMLDialogElement>('records-dialog').showModal();
+  }
+  private renderRecords():void {
+    const r=this.profile.records;
+    element('records-content').innerHTML=`<div class="record-grid"><div><strong>${r.bestScore.toLocaleString('he-IL')}</strong><span>שיא ניקוד</span></div><div><strong>${r.highestLevel}</strong><span>השלב הגבוה ביותר</span></div><div><strong>${this.model.trophies}</strong><span>גביעים</span></div><div><strong>${r.wins}</strong><span>ניצחונות</span></div></div>`;
+    const daily=dailyChallenge(),value=Math.min(daily.target,this.profile.dailyProgress());
+    element('daily-title').textContent=daily.title;
+    element('daily-progress').textContent=`${value} / ${daily.target} · גביע נוסף בהשלמה`;
+    const claim=element<HTMLButtonElement>('claim-daily');claim.disabled=value<daily.target||this.profile.claimed();claim.textContent=this.profile.claimed()?'הגביע היומי כבר נאסף':'קבלו גביע יומי';
+  }
+  private async share():Promise<void> {
+    const wasPaused=this.paused;this.paused=true;this.cancelSwipe?.();this.renderHud();
+    const text=`טריטוריה DUEL — הגעתי לשלב ${this.model.level} עם ${this.model.score.toLocaleString('he-IL')} נקודות. תצליחו לעקוף אותי?`;
+    try{
+      if(navigator.share){await navigator.share({title:'טריטוריה DUEL',text,url:publicGameUrl});}
+      else if(navigator.clipboard){await navigator.clipboard.writeText(`${text} ${publicGameUrl}`);element('share').textContent='הועתק ✓';setTimeout(()=>{element('share').textContent='שתף';},2500);}
+      else{window.prompt('העתיקו ושלחו לחברים:',publicGameUrl);}
+    }catch(error){if(!(error instanceof DOMException&&error.name==='AbortError'))element('status').textContent='השיתוף לא זמין כרגע. הקישור הוא '+publicGameUrl;}finally{this.paused=wasPaused;this.renderHud();}
   }
   private shield(): void {
     if(!this.paused&&!this.inactive&&this.model.activateShield()){this.beep(620);this.renderHud();}
@@ -132,6 +170,12 @@ class GameScene extends Phaser.Scene {
   }
   private renderHud(): void {
     const m = this.model;
+    const day=dayKey(),daily=dailyChallenge(day);const dailyValue=daily.metric==='captures'?m.captures:daily.metric==='cuts'?m.playerCuts:m.percent;
+    this.profile.observe(m.score,m.level,dailyValue,day);
+    if(m.phase==='won'&&!this.recordedWin){this.profile.win();this.recordedWin=true;}
+    if(m.phase!=='won')this.recordedWin=false;
+    element('quick-guide').hidden=m.phase!=='ready';
+    element('daily-teaser').textContent=this.profile.claimed()?'🏆 האתגר היומי הושלם!':`האתגר היומי: ${daily.title} · גביע בונוס`;
     element('level').textContent=`שלב ${m.level}`;
     element('pressure').textContent=['פתיחה','לחץ עולה','מצור','הכרעה'][m.pressure];
     element('score').textContent=m.score.toLocaleString('he-IL');
@@ -159,7 +203,7 @@ class GameScene extends Phaser.Scene {
     document.querySelector('.duel-emblem')!.innerHTML=finished&&m.phase==='won'?'<span class="trophy-emblem">🏆</span>':'<span>◈</span><i>×</i><span>◈</span>';
     element('eyebrow').textContent = finished ? m.phase === 'won' ? `🏆 גביע ${m.trophies} — שלב ${m.level+1} נפתח` : 'כל מסלול מלמד משהו' : 'כובשים בדרך שלכם';
     element('overlay-title').textContent = finished ? m.phase === 'won' ? `ניצחתם את שלב ${m.level}!` : m.rivalPercent >= m.target ? 'המחשב הקדים אתכם.' : 'נגמרו הלבבות.' : 'כובשים. חותכים. מנצחים.';
-    element('overlay-description').textContent = finished ? `אתם: ${m.percent.toFixed(1)}% · המחשב: ${m.rivalPercent.toFixed(1)}%. ${m.phase === 'won' ? 'המגרש שלכם!' : m.message} מוכנים לסיבוב נוסף?` : this.paused ? 'לחצו על ממשיכים או על מקש רווח כדי לחזור למשחק.' : this.inactive ? 'המשחק נעצר אוטומטית. חזרו ללשונית כדי להמשיך.' : `שלב ${m.level}: הגיעו ל־${m.target}% לפני המחשב. לכל פנייה: החליקו קצר והרימו את האצבע. מסלול ארוך מושך התקפה! כפתור המגן נותן 3 שניות הגנה. כל ניצחון מעניק גביע ופותח שלב קשה יותר.`;
+    element('overlay-description').textContent = finished ? `אתם: ${m.percent.toFixed(1)}% · המחשב: ${m.rivalPercent.toFixed(1)}%. ${m.phase === 'won' ? 'המגרש שלכם!' : m.message} מוכנים לסיבוב נוסף?` : this.paused ? 'לחצו על ממשיכים או על מקש רווח כדי לחזור למשחק.' : this.inactive ? 'המשחק נעצר אוטומטית. חזרו ללשונית כדי להמשיך.' : `שלב ${m.level}: אתם בכחול, המחשב באדום. הגיעו ל־${m.target}% לפניו. כששובל בסכנה, כפתור המגן נותן 3 שניות הגנה.`;
     startButton.textContent = finished ? m.phase==='won'?`לשלב ${m.level+1} ←`:`עוד סיבוב — שלב ${m.level} ←` : this.paused ? 'ממשיכים ←' : 'מתחילים לשחק ←';
     element('status').textContent = m.phase === 'recovering' ? `${m.message} חוזרים לבסיס בעוד שנייה.` : m.phase === 'ready' ? 'מוכנים לתחרות על המגרש?' : this.paused ? 'המשחק מושהה. לחצו על המשך בצד המגרש.' : this.inactive ? 'המשחק מושהה כשהלשונית אינה פעילה.' : m.message;
   }
