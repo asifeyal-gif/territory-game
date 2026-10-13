@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>טריטוריה DUEL — כרטיס שיתוף</title><style>
+*{box-sizing:border-box}body{margin:0;padding:24px;background:#0b1824;color:#ecf6fb;font-family:Arial,sans-serif;text-align:center}h1{font-size:24px}p{color:#b9d1df;line-height:1.7}canvas{display:block;width:min(360px,100%);height:auto;margin:20px auto;border-radius:18px;box-shadow:0 15px 60px #0008}a,button{display:inline-block;padding:13px 18px;border:0;border-radius:12px;background:#99dcef;color:#183143;font:700 15px Arial;text-decoration:none;margin:6px;cursor:pointer}.note{font-size:12px}#status{min-height:24px}
+</style></head><body><h1>כרטיס קידום מוכן לסטורי</h1><p>הורידו את התמונה והוסיפו בסטורי מדבקת קישור למשחק.<br>התמונה מציגה צילום אמיתי של המשחק.</p><canvas id="poster" width="1080" height="1920" aria-label="כרטיס קידום למשחק טריטוריה DUEL"></canvas><button id="download" disabled>הורדת תמונה</button><a href="./docs/territory-duel-story.png">פתיחת התמונה לשמירה באייפון</a><a href="./play.html">למשחק</a><p id="status" role="status"></p><p class="note">קישור למדבקת הסטורי: https://asifeyal-gif.github.io/territory-game/play.html</p><script>
+const canvas=document.getElementById('poster'),ctx=canvas.getContext('2d'),button=document.getElementById('download');
+const image=new Image();image.src='./docs/arena-preview.png';image.onload=()=>{
+ const gradient=ctx.createLinearGradient(0,0,1080,1920);gradient.addColorStop(0,'#15384b');gradient.addColorStop(1,'#0a1623');ctx.fillStyle=gradient;ctx.fillRect(0,0,1080,1920);
+ ctx.direction='rtl';ctx.textAlign='center';ctx.fillStyle='#a6e8fa';ctx.font='bold 92px Arial';ctx.fillText('טריטוריה',540,185);ctx.direction='ltr';ctx.font='bold 35px Arial';ctx.fillStyle='#e2f1f6';ctx.fillText('DUEL',540,250);
+ ctx.direction='rtl';ctx.fillStyle='#ffffff';ctx.font='bold 53px Arial';ctx.fillText('תצליחו לנצח את המחשב?',540,365);
+ ctx.font='31px Arial';ctx.fillStyle='#b5d5e1';ctx.fillText('כובשים שטח. חותכים שובל. מרוויחים גביעים.',540,430);
+ const ratio=Math.min(980/image.width,760/image.height),w=image.width*ratio,h=image.height*ratio;ctx.drawImage(image,(1080-w)/2,510+(760-h)/2,w,h);
+ ctx.fillStyle='#eaf7fc';ctx.font='bold 57px Arial';ctx.fillText('האתגר: להגיע לשלב 3',540,1430);
+ ctx.font='36px Arial';ctx.fillStyle='#addce9';ctx.fillText('באייפון ובמחשב · בלי התקנה',540,1510);
+ ctx.fillStyle='#9ce0ef';ctx.beginPath();ctx.roundRect(170,1600,740,125,28);ctx.fill();ctx.fillStyle='#153044';ctx.font='bold 43px Arial';ctx.fillText('שחקו דרך הקישור בסטורי',540,1682);
+ ctx.fillStyle='#86a9bb';ctx.font='27px Arial';ctx.fillText('שלחו צילום של השיא שלכם',540,1835);button.disabled=false;
+};image.onerror=()=>document.getElementById('status').textContent='התמונה לא נטענה. נסו לרענן את העמוד.';
+button.onclick=()=>{canvas.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='territory-duel-story.png';link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);document.getElementById('status').textContent='אם התמונה נפתחת באייפון, לחצו עליה ממושכות ובחרו שמירה בתמונות.';},'image/png');};
+</script></body></html>
